@@ -104,7 +104,22 @@ export default function FeedPage() {
                       {s.timedLyrics?.length > 0 && <div style={{ fontSize: 10, color: 'var(--purple)', marginTop: 2, fontWeight: 700 }}>📝 {s.timedLyrics.length} timed lyric lines</div>}
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-                      <a href="/" className="btn btn-grad" style={{ padding: '7px 14px', fontSize: 12, textDecoration: 'none' }}>▶ Sing</a>
+                      <button
+                        onClick={() => {
+                          const songData = {
+                            title: s.title,
+                            videoId: s.videoId || '',
+                            thumbnail: s.coverUrl ? `${API}${s.coverUrl}` : '',
+                            instrumentalUrl: s.audioFile ? `${API}/uploads/${s.audioFile}` : '',
+                            lyrics: s.lyrics || '',
+                            timedLyrics: s.timedLyrics || null,
+                          }
+                          localStorage.setItem('kk_pending_song', JSON.stringify(songData))
+                          window.location.href = '/'
+                        }}
+                        className="btn btn-grad"
+                        style={{ padding: '7px 14px', fontSize: 12, textDecoration: 'none', cursor: 'pointer' }}
+                      >▶ Sing</button>
                       {mine && (
                         <button onClick={() => removeSong(s.id)} disabled={deleting === s.id} className="btn btn-red" style={{ padding: '7px 12px', fontSize: 12, opacity: deleting === s.id ? 0.6 : 1 }}>
                           {deleting === s.id ? '…' : '🗑'}

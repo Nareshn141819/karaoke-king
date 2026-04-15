@@ -6,9 +6,8 @@ import SearchBar from './SearchBar'
 import Studio from './Studio'
 import Results from './Results'
 
-// In production set NEXT_PUBLIC_API_URL in Vercel env vars to your backend URL (e.g. Railway)
-const API = process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:5000` : 'http://localhost:5000')
+// Set NEXT_PUBLIC_API in Vercel env vars to your backend URL (e.g. Railway)
+const API = process.env.NEXT_PUBLIC_API || 'http://localhost:5000'
 
 export default function App() {
   const [view, setView] = useState(() => {
@@ -40,11 +39,25 @@ export default function App() {
     }
   }, [view, song, score])
 
+  // Auto-navigate to studio if a song was queued from another page (e.g. FeedPage)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const pending = localStorage.getItem('kk_pending_song')
+    if (pending) {
+      localStorage.removeItem('kk_pending_song')
+      try {
+        const s = JSON.parse(pending)
+        setSong(s)
+        setView('studio')
+      } catch { }
+    }
+  }, [])
+
   useEffect(() => {
     fetch(`${API}/api/songs`)
       .then(r => r.ok ? r.json() : { songs: [] })
       .then(d => setSongs(d.songs || []))
-      .catch(() => { })
+      .catch(() => setSongs([]))
       .finally(() => setSongsLoading(false))
   }, [])
 
@@ -56,7 +69,7 @@ export default function App() {
     setQsResults([])
     setQsLoading(true)
     try {
-      const r = await fetch(`${API}/api/search?q=${encodeURIComponent(artist + ' karaoke')}`)
+      const r = await fetch(`${API}/api/search?q=${encodeURIComponent(artist)}`)
       const d = r.ok ? await r.json() : {}
       setQsResults(d.items || [])
     } catch { setQsResults([]) }
