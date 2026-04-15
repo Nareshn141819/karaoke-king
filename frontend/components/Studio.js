@@ -14,6 +14,7 @@ function decodeHtml(str) {
 
 export default function Studio({ song, onDone, onBack }) {
   const [phase, setPhase] = useState('ready')  // ready|rec|processing
+  const [isMobile, setIsMobile] = useState(false)
   const [dur, setDur] = useState(0)
   const [bars, setBars] = useState(Array(36).fill(4))
   const [lyrics, setLyrics] = useState(null)
@@ -33,6 +34,14 @@ export default function Studio({ song, onDone, onBack }) {
 
   // earphone reminder popup
   const [showTip, setShowTip] = useState(true)
+
+  // Responsive: detect mobile screen
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   const recRef = useRef(null)
   const chunks = useRef([])
@@ -411,7 +420,7 @@ export default function Studio({ song, onDone, onBack }) {
           </div>
 
           {/* ── VIDEO + LYRICS ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 14, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,1fr) minmax(0,1fr)', gap: 14, marginBottom: 14 }}>
             <div className={`card ${!showTip ? 'slide-right' : ''}`} style={{ padding: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 10 }}>🎵 Music</div>
               {song.videoId ? (
