@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from 'react'
-import Navbar from './Navbar'
+import Navbar, { NavbarSkeleton } from './Navbar'
 import BottomNav from './BottomNav'
 import SearchBar from './SearchBar'
 import Studio from './Studio'
@@ -83,6 +83,49 @@ export default function App() {
     <Results score={score} song={song} onAgain={() => setView('studio')} onNew={() => { setSong(null); setScore(null); setView('home') }} />
   )
 
+  // ── Full skeleton page while initial data loads ──
+  if (songsLoading) return (
+    <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
+      <NavbarSkeleton />
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: 'calc(var(--nav) + 20px) 16px calc(var(--bot) + 32px)' }}>
+
+        {/* Skeleton Hero */}
+        <div className="skeleton" style={{ borderRadius: 24, height: 190, marginBottom: 28 }} />
+
+        {/* Skeleton Songs section header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div className="skeleton" style={{ width: 170, height: 22, borderRadius: 6 }} />
+          <div className="skeleton" style={{ width: 56, height: 16, borderRadius: 6 }} />
+        </div>
+
+        {/* Skeleton Song card grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(148px,1fr))', gap: 14, marginBottom: 28 }}>
+          {Array(6).fill(0).map((_, i) => (
+            <div key={i} style={{ borderRadius: 16, overflow: 'hidden', background: 'white', border: '1px solid var(--border)', boxShadow: 'var(--sh)' }}>
+              <div className="skeleton" style={{ height: 96 }} />
+              <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div className="skeleton" style={{ height: 12, borderRadius: 6, width: '85%' }} />
+                <div className="skeleton" style={{ height: 10, borderRadius: 6, width: '55%' }} />
+                <div className="skeleton" style={{ height: 28, borderRadius: 50, marginTop: 4 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Skeleton Quick Search card */}
+        <div className="card" style={{ padding: '20px 22px' }}>
+          <div className="skeleton" style={{ width: 120, height: 14, borderRadius: 6, marginBottom: 14 }} />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {Array(8).fill(0).map((_, i) => (
+              <div key={i} className="skeleton" style={{ width: [80,100,70,90,110,75,95,85][i], height: 32, borderRadius: 50 }} />
+            ))}
+          </div>
+        </div>
+      </div>
+      <BottomNav />
+    </div>
+  )
+
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <Navbar />
@@ -92,7 +135,7 @@ export default function App() {
         <div style={{
           borderRadius: 24, background: 'var(--grad)',
           padding: '28px 24px 32px', marginBottom: 28,
-          position: 'relative', overflow: 'visible',   // ← key fix
+          position: 'relative', overflow: 'visible',
         }}>
           {/* decorative blobs */}
           <div style={{ position: 'absolute', top: -30, right: -10, fontSize: 110, opacity: 0.08, transform: 'rotate(20deg)', pointerEvents: 'none', userSelect: 'none' }}>🎤</div>
@@ -108,7 +151,7 @@ export default function App() {
         </div>
 
         {/* Community Songs */}
-        {(songsLoading || songs.length > 0) && (
+        {songs.length > 0 && (
           <section style={{ marginBottom: 28 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 18, color: 'var(--text)' }}>
@@ -117,21 +160,6 @@ export default function App() {
               <a href="/feed?tab=songs" style={{ fontSize: 13, fontWeight: 800, color: 'var(--pink)', textDecoration: 'none' }}>See all →</a>
             </div>
 
-            {songsLoading ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(148px,1fr))', gap: 14 }}>
-                {Array(6).fill(0).map((_, i) => (
-                  <div key={i} style={{ borderRadius: 16, overflow: 'hidden', background: 'white', border: '1px solid var(--border)', boxShadow: 'var(--sh)' }}>
-                    <div className="skeleton" style={{ height: 96, borderRadius: '0' }} />
-                    <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
-                      <div className="skeleton" style={{ height: 12, borderRadius: 6, width: '85%' }} />
-                      <div className="skeleton" style={{ height: 10, borderRadius: 6, width: '55%' }} />
-                      <div className="skeleton" style={{ height: 28, borderRadius: 50, marginTop: 4 }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-            ) : songs.length > 0 ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(148px,1fr))', gap: 14 }}>
                 {songs.slice(0, 8).map(s => (
                   <SongCard key={s.id} song={s} onSing={() => goSing({
@@ -144,7 +172,6 @@ export default function App() {
                   })} />
                 ))}
               </div>
-            ) : null}
           </section>
         )}
 

@@ -41,6 +41,7 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [following, setFollowing] = useState([])
+  const [followersCount, setFollowersCount] = useState(0)
   const [profileLoading, setProfileLoading] = useState(true)
 
   useEffect(() => {
@@ -55,9 +56,10 @@ export default function ProfilePage() {
     getProfile(u.uid).then(profile => {
       if (profile?.photoUrl) {
         setAvatarUrl(profile.photoUrl)
-        // Sync photo back to local cache
         saveUser({ ...u, photoUrl: profile.photoUrl })
       }
+      // Followers count from Firestore
+      if (profile?.followers) setFollowersCount(profile.followers.length)
       setProfileLoading(false)
     }).catch(() => setProfileLoading(false))
 
@@ -149,13 +151,39 @@ export default function ProfilePage() {
   }
 
   if (!user) return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="spin" />
+    <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
+      <Navbar />
+      <div style={{ maxWidth: 700, margin: '0 auto', padding: 'calc(var(--nav) + 20px) 16px calc(var(--bot) + 24px)' }}>
+        {/* Skeleton hero card */}
+        <div className="skeleton" style={{ borderRadius: 24, height: 340, marginBottom: 20 }} />
+        {/* Skeleton tabs */}
+        <div className="skeleton" style={{ borderRadius: 12, height: 44, marginBottom: 20 }} />
+        {/* Skeleton list items */}
+        {[0,1,2,3].map(i => (
+          <div key={i} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
+            <div className="skeleton" style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0 }} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="skeleton" style={{ height: 14, width: '65%', borderRadius: 6 }} />
+              <div className="skeleton" style={{ height: 11, width: '45%', borderRadius: 6 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <BottomNav />
     </div>
   )
 
   const init = (user.name || 'U').slice(0, 2).toUpperCase()
   const followingCount = following.length
+
+  // Instagram-style stat items
+  const statItems = [
+    { label: 'Songs',     value: songs.length },
+    { label: 'Followers', value: followersCount },
+    { label: 'Following', value: followingCount },
+    { label: 'Perfs',     value: perfs.length },
+    { label: 'Drafts',    value: drafts.length },
+  ]
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
@@ -193,12 +221,20 @@ export default function ProfilePage() {
 
           {!showSettings && (
             <>
-              {/* Stats */}
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
-                {[['Songs', songs.length, '🎵'], ['Perfs', perfs.length, '🎤'], ['Drafts', drafts.length, '💾'], ['Following', followingCount, '👥']].map(([l, v, ic]) => (
-                  <div key={l} style={{ background: 'rgba(255,255,255,0.18)', borderRadius: 14, padding: '10px 14px', minWidth: 60, textAlign: 'center' }}>
-                    <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 20, color: 'white' }}>{v}</div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{ic} {l}</div>
+              {/* Instagram-style stats row */}
+              <div style={{ display: 'flex', marginBottom: 22, borderRadius: 16, overflow: 'hidden', background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
+                {statItems.map((s, idx) => (
+                  <div
+                    key={s.label}
+                    style={{
+                      flex: 1, textAlign: 'center', padding: '12px 4px',
+                      borderRight: idx < statItems.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none',
+                    }}
+                  >
+                    <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 20, color: 'white', lineHeight: 1.1 }}>
+                      {loading || profileLoading ? <span style={{ display: 'inline-block', width: 28, height: 20, borderRadius: 4, background: 'rgba(255,255,255,0.3)', verticalAlign: 'middle' }} /> : s.value}
+                    </div>
+                    <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 3 }}>{s.label}</div>
                   </div>
                 ))}
               </div>
