@@ -26,14 +26,16 @@ export default function Studio({ song, onDone, onBack }) {
   const [line, setLine] = useState(0)
   const [err, setErr] = useState(null)
   // monitoring
-  const [mon, setMon] = useState(true) // Turn on monitoring by default for immersive experience
+  const [mon, setMon] = useState(false) // off by default until earphones confirmed
   const [monVol, setMonVol] = useState(0.75)
-  const [reverb, setReverb] = useState(true) // Default to reverb
-  const [instrVol, setInstrVol] = useState(0.8) // Live instrumental volume slider
-  const [showMix, setShowMix] = useState(false) // Toggle live mixer UI
+  const [reverb, setReverb] = useState(true)
+  const [instrVol, setInstrVol] = useState(0.8)
+  const [showMix, setShowMix] = useState(false)
+  const [earphoneConnected, setEarphoneConnected] = useState(false) // true when wired/bt audio out detected
 
-  // earphone reminder popup
+  // guidance popup
   const [showTip, setShowTip] = useState(true)
+  const [animReady, setAnimReady] = useState(false) // triggers staggered card animations
 
   // Responsive: detect mobile screen
   useEffect(() => {
@@ -41,6 +43,33 @@ export default function Studio({ song, onDone, onBack }) {
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
+  }, [])
+
+  // Earphone / headphone detection
+  useEffect(() => {
+    const detect = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        // Look for any audio output that is NOT the default built-in speaker
+        const audioOutputs = devices.filter(d => d.kind === 'audiooutput')
+        // heuristic: if label contains headphone/earphone/bluetooth/wired keywords, or
+        // there are multiple audio outputs (built-in + external) treat as connected
+        const hasExternal = audioOutputs.some(d => {
+          const lbl = (d.label || '').toLowerCase()
+          return lbl.includes('headphone') || lbl.includes('earphone') ||
+            lbl.includes('bluetooth') || lbl.includes('wired') ||
+            lbl.includes('usb') || lbl.includes('external') || lbl.includes('airpod')
+        })
+        // If we can't read labels (no permission), fall back to checking device count
+        const connected = hasExternal || audioOutputs.length > 1
+        setEarphoneConnected(connected)
+        if (connected) setMon(true)
+      } catch { setEarphoneConnected(false) }
+    }
+    detect()
+    // Re-check when devices change (plug/unplug)
+    navigator.mediaDevices.addEventListener?.('devicechange', detect)
+    return () => navigator.mediaDevices.removeEventListener?.('devicechange', detect)
   }, [])
 
   const recRef = useRef(null)
@@ -364,7 +393,7 @@ export default function Studio({ song, onDone, onBack }) {
               <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 20, color: 'var(--text)', marginBottom: 12 }}>Before You Sing!</div>
               <div style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.75, marginBottom: 8 }}>🎤 <strong>Keep your mic close</strong> to your mouth</div>
               <div style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.75, marginBottom: 24 }}>🎧 <strong>Use wired earphones / headphones</strong> for the best experience and to avoid feedback</div>
-              <button onClick={() => setShowTip(false)} style={{ width: '100%', padding: '14px', borderRadius: 50, border: 'none', background: 'var(--grad)', color: 'white', fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 15, cursor: 'pointer', boxShadow: '0 6px 24px rgba(255,78,138,0.4)' }}>Got it, Let's Sing! 🎤</button>
+              <button onClick={() => { setShowTip(false); setTimeout(() => setAnimReady(true), 80) }} style={{ width: '100%', padding: '14px', borderRadius: 50, border: 'none', background: 'var(--grad)', color: 'white', fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 15, cursor: 'pointer', boxShadow: '0 6px 24px rgba(255,78,138,0.4)' }}>Got it, Let's Sing! 🎤</button>
             </div>
             <style>{`@keyframes popIn{from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}}`}</style>
           </div>
@@ -386,15 +415,37 @@ export default function Studio({ song, onDone, onBack }) {
         <div style={{ maxWidth: 860, margin: '0 auto', padding: '24px 16px 100px' }}>
 
           {/* ── MONITOR CARD ── */}
-          <div className={`card ${!showTip ? 'slide-up' : ''}`} style={{ padding: '16px 20px', marginBottom: 14, background: mon ? 'linear-gradient(135deg,rgba(255,255,255,0.95),rgba(255,255,255,1))' : 'white', border: mon ? '2px solid rgba(155,92,246,0.5)' : '1px solid var(--border)', boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }}>
+          <div
+            className={`card studio-card ${animReady ? 'anim-in' : ''}`}
+            style={{
+              padding: '16px 20px', marginBottom: 14,
+              background: mon ? 'linear-gradient(135deg,rgba(255,255,255,0.95),rgba(255,255,255,1))' : 'white',
+              border: mon ? '2px solid rgba(155,92,246,0.5)' : '1px solid var(--border)',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+              animationDelay: '0ms',
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 26 }}>🎧</div>
               <div style={{ flex: 1, minWidth: 160 }}>
                 <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>Voice Monitoring & Mixing</div>
-                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 1 }}>{mon ? 'Hear yourself clearly in earphones' : 'Toggle to enable monitoring and mixing'}</div>
+                <div style={{ fontSize: 12, color: earphoneConnected ? 'var(--text3)' : '#E0284A', marginTop: 1 }}>
+                  {earphoneConnected
+                    ? (mon ? 'Hear yourself clearly in earphones' : 'Toggle to enable monitoring')
+                    : '🔌 Connect earphones/headphones to enable monitoring'}
+                </div>
               </div>
-              <div className="toggle" style={{ background: mon ? 'var(--grad)' : '#D1D5DB' }} onClick={() => setMon(v => !v)}>
-                <div className="toggle-knob" style={{ left: mon ? 23 : 3 }} />
+              <div
+                title={earphoneConnected ? '' : 'Connect earphones first'}
+                className="toggle"
+                style={{
+                  background: !earphoneConnected ? '#E5E7EB' : mon ? 'var(--grad)' : '#D1D5DB',
+                  cursor: earphoneConnected ? 'pointer' : 'not-allowed',
+                  opacity: earphoneConnected ? 1 : 0.55,
+                }}
+                onClick={() => earphoneConnected && setMon(v => !v)}
+              >
+                <div className="toggle-knob" style={{ left: mon && earphoneConnected ? 23 : 3 }} />
               </div>
             </div>
             {mon && (
@@ -421,7 +472,10 @@ export default function Studio({ song, onDone, onBack }) {
 
           {/* ── VIDEO + LYRICS ── */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,1fr) minmax(0,1fr)', gap: 14, marginBottom: 14 }}>
-            <div className={`card ${!showTip ? 'slide-right' : ''}`} style={{ padding: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }}>
+            <div
+              className={`card studio-card ${animReady ? 'anim-in' : ''}`}
+              style={{ padding: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.1)', animationDelay: '150ms' }}
+            >
               <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 10 }}>🎵 Music</div>
               {song.videoId ? (
                 <div style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
@@ -442,7 +496,10 @@ export default function Studio({ song, onDone, onBack }) {
               <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text3)' }}>💡 {song.instrumentalUrl ? 'Instrumental auto-mixes with your voice' : 'Music plays on record'}</div>
             </div>
 
-            <div className={`card ${!showTip ? 'slide-left' : ''}`} style={{ padding: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }}>
+            <div
+              className={`card studio-card ${animReady ? 'anim-in' : ''}`}
+              style={{ padding: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.1)', animationDelay: '300ms' }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 1.5 }}>🎤 Lyrics</div>
@@ -468,7 +525,10 @@ export default function Studio({ song, onDone, onBack }) {
           </div>
 
           {/* ── RECORDING CONTROLS ── */}
-          <div className={`card ${!showTip ? 'slide-up' : ''}`} style={{ padding: '40px 20px 36px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.98)' }}>
+          <div
+            className={`card studio-card ${animReady ? 'anim-in' : ''}`}
+            style={{ padding: '40px 20px 36px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.98)', animationDelay: '450ms' }}
+          >
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', marginBottom: 28, minHeight: 150 }}>
               {/* Left: 24-Segment LED Peak Meter (Vertical Alignment) */}

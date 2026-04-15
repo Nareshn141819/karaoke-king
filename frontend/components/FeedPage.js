@@ -6,12 +6,24 @@ import PerformanceCard from './PerformanceCard'
 import { getUser, getCommunityFeed, delCommunityFeed } from '../lib/store'
 const API = process.env.NEXT_PUBLIC_API || 'http://localhost:5000'
 
+// Follow helpers
+const getFollowing = () => { try { return JSON.parse(localStorage.getItem('kk_following') || '[]') } catch { return [] } }
+const toggleFollow = (uid) => {
+  const list = getFollowing()
+  const idx = list.indexOf(uid)
+  if (idx >= 0) list.splice(idx, 1); else list.push(uid)
+  localStorage.setItem('kk_following', JSON.stringify(list))
+  return list
+}
+
 export default function FeedPage() {
   const [songs, setSongs] = useState([])
   const [perfs, setPerfs] = useState([])
   const [tab, setTab] = useState('perfs')
   const [user, setUser] = useState(null)
   const [deleting, setDeleting] = useState(null)
+  const [songSearch, setSongSearch] = useState('')  // search query for songs tab
+  const [following, setFollowing] = useState(getFollowing())
 
   useEffect(() => {
     const u = getUser()
@@ -91,44 +103,78 @@ export default function FeedPage() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {songs.map(s => {
-                const mine = user && user.uid === s.uploaderUid
-                return (
-                  <div key={s.id} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{ width: 52, height: 52, borderRadius: 12, overflow: 'hidden', flexShrink: 0, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
-                      {s.coverUrl ? <img src={`${API}${s.coverUrl}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🎵'}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: 14 }}>{s.title}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{s.artist || 'Unknown'} · by {s.uploaderName || '?'}</div>
-                      {s.timedLyrics?.length > 0 && <div style={{ fontSize: 10, color: 'var(--purple)', marginTop: 2, fontWeight: 700 }}>📝 {s.timedLyrics.length} timed lyric lines</div>}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-                      <button
-                        onClick={() => {
-                          const songData = {
-                            title: s.title,
-                            videoId: s.videoId || '',
-                            thumbnail: s.coverUrl ? `${API}${s.coverUrl}` : '',
-                            instrumentalUrl: s.audioFile ? `${API}/uploads/${s.audioFile}` : '',
-                            lyrics: s.lyrics || '',
-                            timedLyrics: s.timedLyrics || null,
-                          }
-                          localStorage.setItem('kk_pending_song', JSON.stringify(songData))
-                          window.location.href = '/'
-                        }}
-                        className="btn btn-grad"
-                        style={{ padding: '7px 14px', fontSize: 12, textDecoration: 'none', cursor: 'pointer' }}
-                      >▶ Sing</button>
-                      {mine && (
-                        <button onClick={() => removeSong(s.id)} disabled={deleting === s.id} className="btn btn-red" style={{ padding: '7px 12px', fontSize: 12, opacity: deleting === s.id ? 0.6 : 1 }}>
-                          {deleting === s.id ? '…' : '🗑'}
-                        </button>
-                      )}
-                    </div>
+              {/* Search bar */}
+              <div style={{ position: 'relative' }}>
+                <input
+                  value={songSearch}
+                  onChange={e => setSongSearch(e.target.value)}
+                  placeholder="🔍 Search songs by title or artist…"
+                  className="inp"
+                  style={{ padding: '11px 16px 11px 42px', borderRadius: 50, fontSize: 13, width: '100%' }}
+                />
+                <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 15, pointerEvents: 'none' }}>🔍</span>
+                {songSearch && (
+                  <button onClick={() => setSongSearch('')} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--text3)' }}>×</button>
+                )}
+              </div>
+
+              {/* Filtered list */}
+              {(() => {
+                const q = songSearch.toLowerCase()
+                const filtered = q ? songs.filter(s =>
+                  (s.title || '').toLowerCase().includes(q) ||
+                  (s.artist || '').toLowerCase().includes(q)
+                ) : songs
+                return filtered.length === 0 ? (
+                  <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
+                    No songs match “{songSearch}”
                   </div>
-                )
-              })}
+                ) : filtered.map(s => {
+                  const mine = user && user.uid === s.uploaderUid
+                  const isFollowing = following.includes(s.uploaderUid)
+                  return (
+                    <div key={s.id} className="card lift-card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <div style={{ width: 52, height: 52, borderRadius: 12, overflow: 'hidden', flexShrink: 0, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
+                        {s.coverUrl ? <img src={`${API}${s.coverUrl}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🎵'}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.title}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{s.artist || 'Unknown'} · by {s.uploaderName || '?'}</div>
+                        {s.timedLyrics?.length > 0 && <div style={{ fontSize: 10, color: 'var(--purple)', marginTop: 2, fontWeight: 700 }}>📝 {s.timedLyrics.length} timed lyric lines</div>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* Follow button — not shown for own songs */}
+                        {!mine && s.uploaderUid && (
+                          <button
+                            onClick={() => setFollowing(toggleFollow(s.uploaderUid))}
+                            className={`follow-btn ${isFollowing ? 'following' : ''}`}
+                          >
+                            {isFollowing ? '✔ Following' : '+ Follow'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            const songData = {
+                              title: s.title, videoId: s.videoId || '',
+                              thumbnail: s.coverUrl ? `${API}${s.coverUrl}` : '',
+                              instrumentalUrl: s.audioFile ? `${API}/uploads/${s.audioFile}` : '',
+                              lyrics: s.lyrics || '', timedLyrics: s.timedLyrics || null,
+                            }
+                            localStorage.setItem('kk_pending_song', JSON.stringify(songData))
+                            window.location.href = '/'
+                          }}
+                          className="btn btn-grad" style={{ padding: '7px 14px', fontSize: 12 }}
+                        >▶ Sing</button>
+                        {mine && (
+                          <button onClick={() => removeSong(s.id)} disabled={deleting === s.id} className="btn btn-red" style={{ padding: '7px 12px', fontSize: 12, opacity: deleting === s.id ? 0.6 : 1 }}>
+                            {deleting === s.id ? '…' : '🗑'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
             </div>
           )
         )}

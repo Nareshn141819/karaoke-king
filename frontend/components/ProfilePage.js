@@ -3,8 +3,18 @@ import { useState, useEffect } from 'react'
 import Navbar from './Navbar'
 import BottomNav from './BottomNav'
 import PerformanceCard from './PerformanceCard'
-import { getUser, getCommunityFeed, delCommunityFeed, addCommunityFeed, getDrafts, delDraft, logout, fbUpdateName, fbUpdatePassword } from '../lib/store'
+import { getUser, setUser as saveUser, getCommunityFeed, delCommunityFeed, addCommunityFeed, getDrafts, delDraft, logout, fbUpdateName, fbUpdatePassword } from '../lib/store'
 const API = process.env.NEXT_PUBLIC_API || 'http://localhost:5000'
+
+// Follow helpers (localStorage-based)
+const getFollowing = () => { try { return JSON.parse(localStorage.getItem('kk_following') || '[]') } catch { return [] } }
+const toggleFollow = (uid) => {
+  const list = getFollowing()
+  const idx = list.indexOf(uid)
+  if (idx >= 0) list.splice(idx, 1); else list.push(uid)
+  localStorage.setItem('kk_following', JSON.stringify(list))
+  return list
+}
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null)
@@ -21,12 +31,16 @@ export default function ProfilePage() {
   const [sErr, setSErr] = useState('')
   const [sMsg, setSMsg] = useState('')
   const [sLoad, setSLoad] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState(null)  // base64 profile pic
+  const [following, setFollowing]  = useState([])    // list of followed uids
 
   useEffect(() => {
     const u = getUser()
     if (!u) { window.location.href = '/login'; return }
     setUser(u)
     setNewName(u.name || '')
+    setAvatarUrl(u.avatarUrl || null)
+    setFollowing(getFollowing())
 
     getCommunityFeed().then(all => {
       setPerfs(all.filter(p => p.uid === u.uid))
@@ -72,6 +86,21 @@ export default function ProfilePage() {
 
   const signOut = () => { logout(); window.location.href = '/' }
 
+  // Profile picture handler
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const url = ev.target.result
+      setAvatarUrl(url)
+      const updated = { ...user, avatarUrl: url }
+      setUser(updated)
+      saveUser(updated)
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleUpdateName = async () => {
     if (!newName.trim() || newName === user.name) return
     setSLoad(true); setSErr(''); setSMsg('')
@@ -101,6 +130,7 @@ export default function ProfilePage() {
   )
 
   const init = (user.name || 'U').slice(0, 2).toUpperCase()
+  const followingCount = following.length
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
@@ -119,7 +149,15 @@ export default function ProfilePage() {
             ⚙️
           </button>
 
-          <div className="av" style={{ width: 80, height: 80, fontSize: 28, margin: '0 auto 14px', background: 'rgba(255,255,255,0.25)', border: '3px solid rgba(255,255,255,0.5)' }}>{init}</div>
+          {/* Clickable avatar — tap to upload photo */}
+          <label className="av-upload" style={{ margin: '0 auto 14px', display: 'block', width: 80, height: 80 }}>
+            <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} />
+            {avatarUrl
+              ? <img src={avatarUrl} alt="avatar" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.6)' }} />
+              : <div className="av" style={{ width: 80, height: 80, fontSize: 28, background: 'rgba(255,255,255,0.25)', border: '3px solid rgba(255,255,255,0.5)' }}>{init}</div>
+            }
+            <div className="av-overlay">📷</div>
+          </label>
           <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 22, color: 'white', marginBottom: 4 }}>{user.name}</h2>
           <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, marginBottom: 20 }}>{user.email}</p>
 
@@ -127,8 +165,8 @@ export default function ProfilePage() {
             <>
               {/* Stats */}
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
-                {[['Songs', songs.length, '🎵'], ['Performances', perfs.length, '🎤'], ['Drafts', drafts.length, '💾']].map(([l, v, ic]) => (
-                  <div key={l} style={{ background: 'rgba(255,255,255,0.18)', borderRadius: 14, padding: '10px 16px', minWidth: 68, textAlign: 'center' }}>
+                {[['Songs', songs.length, '🎵'], ['Perfs', perfs.length, '🎤'], ['Drafts', drafts.length, '💾'], ['Following', followingCount, '👥']].map(([l, v, ic]) => (
+                  <div key={l} style={{ background: 'rgba(255,255,255,0.18)', borderRadius: 14, padding: '10px 14px', minWidth: 60, textAlign: 'center' }}>
                     <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 20, color: 'white' }}>{v}</div>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{ic} {l}</div>
                   </div>
@@ -203,7 +241,19 @@ export default function ProfilePage() {
                         {s.timedLyrics?.length > 0 && <div style={{ fontSize: 11, color: 'var(--purple)', marginTop: 2 }}>📝 {s.timedLyrics.length} timed lyric lines</div>}
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                        <a href="/" className="btn btn-grad" style={{ padding: '7px 14px', fontSize: 12, textDecoration: 'none' }}>▶ Sing</a>
+                        <button
+                          onClick={() => {
+                            const songData = {
+                              title: s.title, videoId: s.videoId || '',
+                              thumbnail: s.coverUrl ? `${API}${s.coverUrl}` : '',
+                              instrumentalUrl: s.audioFile ? `${API}/uploads/${s.audioFile}` : '',
+                              lyrics: s.lyrics || '', timedLyrics: s.timedLyrics || null,
+                            }
+                            localStorage.setItem('kk_pending_song', JSON.stringify(songData))
+                            window.location.href = '/'
+                          }}
+                          className="btn btn-grad" style={{ padding: '7px 14px', fontSize: 12 }}
+                        >▶ Sing</button>
                         <button onClick={() => deleteSong(s.id)} className="btn btn-red" style={{ padding: '7px 12px', fontSize: 12 }}>🗑</button>
                       </div>
                     </div>

@@ -376,12 +376,12 @@ body {
 
 /* Song card hover */
 .song-card {
-  transition: transform 0.18s, box-shadow 0.18s;
+  transition: transform 0.22s cubic-bezier(0.2,0.8,0.2,1), box-shadow 0.22s;
   cursor: pointer;
 }
 
 .song-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px) scale(1.01);
   box-shadow: var(--sh2);
 }
 
@@ -389,4 +389,87 @@ body {
 .pg {
   padding-top: calc(var(--nav) + 16px);
   padding-bottom: calc(var(--bot) + 20px);
+}
+
+/* ── Skeleton shimmer ── */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #EDE8FA 25%, #F5F1FF 50%, #EDE8FA 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 10px;
+}
+
+/* ── Studio staggered card entry ── */
+@keyframes studioCardIn {
+  from { opacity: 0; transform: translateY(28px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+.studio-card {
+  opacity: 0;
+}
+
+.studio-card.anim-in {
+  animation: studioCardIn 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* ── Hover lift for interactive list cards ── */
+.lift-card {
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+.lift-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(155,92,246,0.18);
+}
+
+/* ── Follow button ── */
+.follow-btn {
+  padding: 6px 18px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 2px solid var(--pink);
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: 'Nunito', sans-serif;
+}
+.follow-btn.following {
+  background: var(--grad);
+  color: white;
+  border-color: transparent;
+}
+.follow-btn:not(.following) {
+  background: transparent;
+  color: var(--pink);
+}
+.follow-btn:hover {
+  transform: scale(1.05);
+}
+
+/* ── Avatar upload ring ── */
+.av-upload {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+.av-upload:hover .av-overlay {
+  opacity: 1;
+}
+.av-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  font-size: 20px;
+  color: white;
 }
