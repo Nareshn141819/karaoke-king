@@ -2,7 +2,7 @@
 const isBrowser = () => typeof window !== 'undefined'
 import { db, auth, googleProvider, storage } from './firebase'
 import { collection, addDoc, getDocs, deleteDoc, doc, getDoc, setDoc, updateDoc, query, orderBy, limit, where } from 'firebase/firestore'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, updatePassword as fbUpdatePasswordInternal } from 'firebase/auth'
 
 export const store = {
@@ -23,7 +23,22 @@ export const setUser = (u) => store.set('kk_user', u)
 export const logout  = () => { store.del('kk_user'); store.del('kk_profile') }
 
 // ── Firebase user profile (Firestore: users/{uid}) ──────────────
-// Shape: { uid, name, email, photoUrl, songsAdded, performances, drafts, followers: [] }
+/**
+ * Organised user document shape:
+ * {
+ *   uid:          string,
+ *   name:         string,
+ *   email:        string,
+ *   photoUrl:     string | null,
+ *   followers:    string[],        // uid list
+ *   following:    string[],        // uid list
+ *   songsCount:   number,          // songs uploaded
+ *   performances: number,          // posts to community feed
+ *   drafts:       number,          // saved drafts
+ *   createdAt:    ISO string,
+ *   updatedAt:    ISO string,
+ * }
+ */
 export async function getProfile(uid) {
   if (!uid) return null
   try {
@@ -36,12 +51,27 @@ export async function getProfile(uid) {
 export async function upsertProfile(uid, fields) {
   if (!uid) return
   try {
-    const ref = doc(db, 'users', uid)
-    const snap = await getDoc(ref)
+    const docRef = doc(db, 'users', uid)
+    const snap = await getDoc(docRef)
+    const now = new Date().toISOString()
     if (snap.exists()) {
-      await updateDoc(ref, fields)
+      await updateDoc(docRef, { ...fields, updatedAt: now })
     } else {
-      await setDoc(ref, { uid, followers: [], songsAdded: 0, performances: 0, drafts: 0, ...fields })
+      // Create clean initial document
+      await setDoc(docRef, {
+        uid,
+        name: fields.name || '',
+        email: fields.email || '',
+        photoUrl: fields.photoUrl || null,
+        followers: [],
+        following: [],
+        songsCount: 0,
+        performances: 0,
+        drafts: 0,
+        createdAt: now,
+        updatedAt: now,
+        ...fields,
+      })
     }
     // Update local cache
     const local = getUser()
@@ -51,27 +81,115 @@ export async function upsertProfile(uid, fields) {
   } catch (e) { console.warn('upsertProfile error', e) }
 }
 
+/**
+ * Upload avatar to Firebase Storage using uploadBytesResumable.
+ * Falls back to storing a compressed base64 Data URL in Firestore if Storage fails.
+ */
 export async function uploadAvatar(uid, file) {
   if (!uid || !file) return null
   try {
-    const storageRef = ref(storage, `avatars/${uid}/avatar.jpg`)
-    await uploadBytes(storageRef, file, { contentType: 'image/jpeg' })
-    const url = await getDownloadURL(storageRef)
-    // Persist in Firestore profile + local user cache
-    await upsertProfile(uid, { photoUrl: url })
-    return url
-  } catch (e) { console.warn('uploadAvatar error', e); return null }
+    // Use the file's actual MIME type, fallback to image/jpeg
+    const contentType = file.type || 'image/jpeg'
+    const ext = file.name?.split('.').pop()?.toLowerCase() || 'jpg'
+    const storageRef = ref(storage, `avatars/${uid}/avatar.${ext}`)
+    const metadata = { contentType }
+
+    // Try Firebase Storage upload first
+    try {
+      const uploadTask = uploadBytesResumable(storageRef, file, metadata)
+
+      await new Promise((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          null,
+          (error) => reject(error),
+          () => resolve()
+        )
+      })
+
+      const url = await getDownloadURL(uploadTask.snapshot.ref)
+      await upsertProfile(uid, { photoUrl: url, updatedAt: new Date().toISOString() })
+      return url
+    } catch (storageErr) {
+      // ── Fallback: compress image and store as Data URL in Firestore ──
+      console.warn('Storage upload failed, falling back to base64:', storageErr?.code || storageErr?.message)
+      const dataUrl = await compressImageToDataUrl(file, 200, 200, 0.7)
+      if (dataUrl) {
+        await upsertProfile(uid, { photoUrl: dataUrl, updatedAt: new Date().toISOString() })
+        return dataUrl
+      }
+      return null
+    }
+  } catch (e) {
+    console.warn('uploadAvatar error:', e?.code, e?.message)
+    return null
+  }
+}
+
+/** Compress an image File to a small Data URL (JPEG) */
+function compressImageToDataUrl(file, maxW = 200, maxH = 200, quality = 0.75) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      let { width, height } = img
+      if (width > maxW) { height = Math.round(height * maxW / width); width = maxW }
+      if (height > maxH) { width = Math.round(width * maxH / height); height = maxH }
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, width, height)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+    img.src = url
+  })
+}
+
+/** Increment a numeric counter on user profile (e.g. songsCount, performances, drafts) */
+export async function incrementUserStat(uid, field) {
+  if (!uid || !field) return
+  try {
+    const docRef = doc(db, 'users', uid)
+    const snap = await getDoc(docRef)
+    if (snap.exists()) {
+      const current = snap.data()[field] || 0
+      await updateDoc(docRef, { [field]: current + 1, updatedAt: new Date().toISOString() })
+    }
+    const local = getUser()
+    if (local && local.uid === uid) {
+      setUser({ ...local, [field]: (local[field] || 0) + 1 })
+    }
+  } catch (e) { console.warn('incrementUserStat error', e) }
 }
 
 export async function followUser(currentUid, targetUid) {
   if (!currentUid || !targetUid) return
   try {
-    const ref = doc(db, 'users', targetUid)
-    const snap = await getDoc(ref)
+    // Update target user's followers list
+    const targetRef = doc(db, 'users', targetUid)
+    const snap = await getDoc(targetRef)
     const data = snap.exists() ? snap.data() : {}
     const followers = data.followers || []
     const already = followers.includes(currentUid)
-    await updateDoc(ref, { followers: already ? followers.filter(u => u !== currentUid) : [...followers, currentUid] })
+    await updateDoc(targetRef, {
+      followers: already ? followers.filter(u => u !== currentUid) : [...followers, currentUid],
+      updatedAt: new Date().toISOString()
+    })
+
+    // Update current user's following list
+    const currentRef = doc(db, 'users', currentUid)
+    const currentSnap = await getDoc(currentRef)
+    if (currentSnap.exists()) {
+      const following = currentSnap.data().following || []
+      await updateDoc(currentRef, {
+        following: already ? following.filter(u => u !== targetUid) : [...following, targetUid],
+        updatedAt: new Date().toISOString()
+      })
+    }
+
     return !already // returns new follow state
   } catch { return false }
 }
@@ -158,7 +276,10 @@ export async function fbSignUp(email, pass, name) {
     const res = await createUserWithEmailAndPassword(auth, email, pass)
     const user = res.user
     await updateProfile(user, { displayName: name })
-    return { uid: user.uid, email: user.email, name, token: await user.getIdToken() }
+    const userData = { uid: user.uid, email: user.email, name, token: await user.getIdToken() }
+    // Create clean Firestore user document
+    await upsertProfile(user.uid, { name, email: user.email, photoUrl: null })
+    return userData
   } catch (e) { throw new Error(friendlyErr(e.code || e.message)) }
 }
 
@@ -167,7 +288,10 @@ export async function fbSignIn(email, pass) {
     const res = await signInWithEmailAndPassword(auth, email, pass)
     const user = res.user
     const name = user.displayName || user.email.split('@')[0]
-    return { uid: user.uid, email: user.email, name, token: await user.getIdToken() }
+    const userData = { uid: user.uid, email: user.email, name, token: await user.getIdToken() }
+    // Ensure Firestore profile exists
+    await upsertProfile(user.uid, { name, email: user.email })
+    return userData
   } catch (e) { throw new Error(friendlyErr(e.code || e.message)) }
 }
 
@@ -176,7 +300,15 @@ export async function fbGoogleSignIn() {
     const res = await signInWithPopup(auth, googleProvider)
     const user = res.user
     const name = user.displayName || user.email.split('@')[0]
-    return { uid: user.uid, email: user.email, name, token: await user.getIdToken() }
+    const userData = { uid: user.uid, email: user.email, name, token: await user.getIdToken() }
+    // Ensure Firestore profile exists (don't overwrite photo if already set)
+    const profile = await getProfile(user.uid)
+    if (!profile) {
+      await upsertProfile(user.uid, { name, email: user.email, photoUrl: user.photoURL || null })
+    } else {
+      await upsertProfile(user.uid, { name, email: user.email })
+    }
+    return userData
   } catch (e) {
     if (e.code === 'auth/popup-closed-by-user') throw new Error('Sign-in cancelled')
     throw new Error(friendlyErr(e.code || e.message))
@@ -188,6 +320,7 @@ export async function fbUpdateName(name) {
   if (!user) throw new Error('Not authenticated')
   try {
     await updateProfile(user, { displayName: name })
+    await upsertProfile(user.uid, { name })
     const local = getUser()
     if (local) { local.name = name; setUser(local) }
     return name

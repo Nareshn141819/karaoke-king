@@ -114,7 +114,7 @@ export default function App() {
               <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 18, color: 'var(--text)' }}>
                 🎵 Community Songs
               </h2>
-              <a href="/feed" style={{ fontSize: 13, fontWeight: 800, color: 'var(--pink)', textDecoration: 'none' }}>See all →</a>
+              <a href="/feed?tab=songs" style={{ fontSize: 13, fontWeight: 800, color: 'var(--pink)', textDecoration: 'none' }}>See all →</a>
             </div>
 
             {songsLoading ? (

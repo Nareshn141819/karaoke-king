@@ -6,6 +6,23 @@ import PerformanceCard from './PerformanceCard'
 import { getUser, getCommunityFeed, delCommunityFeed } from '../lib/store'
 const API = process.env.NEXT_PUBLIC_API || 'http://localhost:5000'
 
+// SVG Icons
+const SearchIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+  </svg>
+)
+const TrashIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+  </svg>
+)
+const XIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+  </svg>
+)
+
 // Follow helpers
 const getFollowing = () => { try { return JSON.parse(localStorage.getItem('kk_following') || '[]') } catch { return [] } }
 const toggleFollow = (uid) => {
@@ -30,6 +47,13 @@ export default function FeedPage() {
   useEffect(() => {
     const u = getUser()
     setUser(u)
+
+    // Read ?tab=songs from URL to default to Songs tab
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('tab') === 'songs') setTab('songs')
+    }
+
     getCommunityFeed().then(feed => setPerfs(feed)).finally(() => setFeedLoading(false))
     fetch(`${API}/api/songs`)
       .then(r => r.ok ? r.json() : { songs: [] })
@@ -78,7 +102,7 @@ export default function FeedPage() {
           feedLoading ? (
             /* Skeleton for performances */
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {[0,1,2].map(i => (
+              {[0, 1, 2].map(i => (
                 <div key={i} className="card" style={{ padding: 20 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                     <div className="skeleton" style={{ width: 44, height: 44, borderRadius: '50%' }} />
@@ -117,7 +141,7 @@ export default function FeedPage() {
         {tab === 'songs' && (
           songsLoading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {[0,1,2,3].map(i => (
+              {[0, 1, 2, 3].map(i => (
                 <div key={i} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
                   <div className="skeleton" style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0 }} />
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -144,13 +168,17 @@ export default function FeedPage() {
                 <input
                   value={songSearch}
                   onChange={e => setSongSearch(e.target.value)}
-                  placeholder="🔍 Search songs by title or artist…"
+                  placeholder="Search songs by title or artist…"
                   className="inp"
                   style={{ padding: '11px 16px 11px 42px', borderRadius: 50, fontSize: 13, width: '100%' }}
                 />
-                <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 15, pointerEvents: 'none' }}>🔍</span>
+                <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text3)', display: 'flex', alignItems: 'center' }}>
+                  <SearchIcon />
+                </span>
                 {songSearch && (
-                  <button onClick={() => setSongSearch('')} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--text3)' }}>×</button>
+                  <button onClick={() => setSongSearch('')} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text3)', width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                    <XIcon />
+                  </button>
                 )}
               </div>
 
@@ -163,7 +191,7 @@ export default function FeedPage() {
                 ) : songs
                 return filtered.length === 0 ? (
                   <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
-                    No songs match “{songSearch}”
+                    No songs match "{songSearch}"
                   </div>
                 ) : filtered.map(s => {
                   const mine = user && user.uid === s.uploaderUid
@@ -202,8 +230,13 @@ export default function FeedPage() {
                           className="btn btn-grad" style={{ padding: '7px 14px', fontSize: 12 }}
                         >▶ Sing</button>
                         {mine && (
-                          <button onClick={() => removeSong(s.id)} disabled={deleting === s.id} className="btn btn-red" style={{ padding: '7px 12px', fontSize: 12, opacity: deleting === s.id ? 0.6 : 1 }}>
-                            {deleting === s.id ? '…' : '🗑'}
+                          <button
+                            onClick={() => removeSong(s.id)}
+                            disabled={deleting === s.id}
+                            className="btn btn-red"
+                            style={{ padding: '7px 10px', fontSize: 12, opacity: deleting === s.id ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 4 }}
+                          >
+                            {deleting === s.id ? '…' : <TrashIcon />}
                           </button>
                         )}
                       </div>
