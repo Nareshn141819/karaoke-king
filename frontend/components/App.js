@@ -119,16 +119,18 @@ export default function App() {
 
             {songsLoading ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(148px,1fr))', gap: 14 }}>
-                {Array(4).fill(0).map((_, i) => (
-                  <div key={i} style={{ borderRadius: 16, overflow: 'hidden', background: 'white', border: '1px solid var(--border)' }}>
-                    <div style={{ height: 96, background: 'linear-gradient(90deg,#F0EBFF 25%,#E8E0F8 50%,#F0EBFF 75%)', backgroundSize: '200% 100%' }} />
-                    <div style={{ padding: '10px 12px' }}>
-                      <div style={{ height: 12, borderRadius: 6, background: '#F0EBFF', marginBottom: 8 }} />
-                      <div style={{ height: 10, borderRadius: 6, background: '#F0EBFF', width: '60%' }} />
+                {Array(6).fill(0).map((_, i) => (
+                  <div key={i} style={{ borderRadius: 16, overflow: 'hidden', background: 'white', border: '1px solid var(--border)', boxShadow: 'var(--sh)' }}>
+                    <div className="skeleton" style={{ height: 96, borderRadius: '0' }} />
+                    <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      <div className="skeleton" style={{ height: 12, borderRadius: 6, width: '85%' }} />
+                      <div className="skeleton" style={{ height: 10, borderRadius: 6, width: '55%' }} />
+                      <div className="skeleton" style={{ height: 28, borderRadius: 50, marginTop: 4 }} />
                     </div>
                   </div>
                 ))}
               </div>
+
             ) : songs.length > 0 ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(148px,1fr))', gap: 14 }}>
                 {songs.slice(0, 8).map(s => (

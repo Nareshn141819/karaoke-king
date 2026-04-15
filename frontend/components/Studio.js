@@ -474,7 +474,7 @@ export default function Studio({ song, onDone, onBack }) {
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,1fr) minmax(0,1fr)', gap: 14, marginBottom: 14 }}>
             <div
               className={`card studio-card ${animReady ? 'anim-in' : ''}`}
-              style={{ padding: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.1)', animationDelay: '150ms' }}
+              style={{ padding: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.1)', animationDelay: '250ms' }}
             >
               <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 10 }}>🎵 Music</div>
               {song.videoId ? (
@@ -498,7 +498,7 @@ export default function Studio({ song, onDone, onBack }) {
 
             <div
               className={`card studio-card ${animReady ? 'anim-in' : ''}`}
-              style={{ padding: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.1)', animationDelay: '300ms' }}
+              style={{ padding: 14, boxShadow: '0 10px 40px rgba(0,0,0,0.1)', animationDelay: '500ms' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div>
@@ -527,7 +527,7 @@ export default function Studio({ song, onDone, onBack }) {
           {/* ── RECORDING CONTROLS ── */}
           <div
             className={`card studio-card ${animReady ? 'anim-in' : ''}`}
-            style={{ padding: '40px 20px 36px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.98)', animationDelay: '450ms' }}
+            style={{ padding: '40px 20px 36px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.98)', animationDelay: '750ms' }}
           >
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', marginBottom: 28, minHeight: 150 }}>

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import Navbar from './Navbar'
 import BottomNav from './BottomNav'
 import PerformanceCard from './PerformanceCard'
-import { getUser, setUser as saveUser, getCommunityFeed, delCommunityFeed, addCommunityFeed, getDrafts, delDraft, logout, fbUpdateName, fbUpdatePassword } from '../lib/store'
+import { getUser, setUser as saveUser, getCommunityFeed, delCommunityFeed, addCommunityFeed, getDrafts, delDraft, logout, fbUpdateName, fbUpdatePassword, getProfile, upsertProfile, uploadAvatar } from '../lib/store'
 const API = process.env.NEXT_PUBLIC_API || 'http://localhost:5000'
 
 // Follow helpers (localStorage-based)
@@ -31,16 +31,28 @@ export default function ProfilePage() {
   const [sErr, setSErr] = useState('')
   const [sMsg, setSMsg] = useState('')
   const [sLoad, setSLoad] = useState(false)
-  const [avatarUrl, setAvatarUrl] = useState(null)  // base64 profile pic
-  const [following, setFollowing]  = useState([])    // list of followed uids
+  const [avatarUrl, setAvatarUrl] = useState(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [following, setFollowing] = useState([])
+  const [profileLoading, setProfileLoading] = useState(true)
 
   useEffect(() => {
     const u = getUser()
     if (!u) { window.location.href = '/login'; return }
     setUser(u)
     setNewName(u.name || '')
-    setAvatarUrl(u.avatarUrl || null)
+    setAvatarUrl(u.photoUrl || null)
     setFollowing(getFollowing())
+
+    // Fetch Firestore profile
+    getProfile(u.uid).then(profile => {
+      if (profile?.photoUrl) {
+        setAvatarUrl(profile.photoUrl)
+        // Sync photo back to local cache
+        saveUser({ ...u, photoUrl: profile.photoUrl })
+      }
+      setProfileLoading(false)
+    }).catch(() => setProfileLoading(false))
 
     getCommunityFeed().then(all => {
       setPerfs(all.filter(p => p.uid === u.uid))
@@ -86,19 +98,25 @@ export default function ProfilePage() {
 
   const signOut = () => { logout(); window.location.href = '/' }
 
-  // Profile picture handler
-  const handleAvatarChange = (e) => {
+  // Profile picture handler — uploads to Firebase Storage
+  const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const url = ev.target.result
-      setAvatarUrl(url)
-      const updated = { ...user, avatarUrl: url }
-      setUser(updated)
-      saveUser(updated)
-    }
-    reader.readAsDataURL(file)
+    if (!file || !user?.uid) return
+    setAvatarUploading(true)
+    try {
+      const url = await uploadAvatar(user.uid, file)
+      if (url) {
+        setAvatarUrl(url)
+        saveUser({ ...user, photoUrl: url })
+        // Also sync stats to Firestore while we're here
+        await upsertProfile(user.uid, {
+          name: user.name,
+          email: user.email,
+          photoUrl: url,
+        })
+      }
+    } catch (e) { console.warn(e) }
+    finally { setAvatarUploading(false) }
   }
 
   const handleUpdateName = async () => {
@@ -152,11 +170,16 @@ export default function ProfilePage() {
           {/* Clickable avatar — tap to upload photo */}
           <label className="av-upload" style={{ margin: '0 auto 14px', display: 'block', width: 80, height: 80 }}>
             <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} />
-            {avatarUrl
-              ? <img src={avatarUrl} alt="avatar" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.6)' }} />
-              : <div className="av" style={{ width: 80, height: 80, fontSize: 28, background: 'rgba(255,255,255,0.25)', border: '3px solid rgba(255,255,255,0.5)' }}>{init}</div>
-            }
-            <div className="av-overlay">📷</div>
+            {avatarUploading ? (
+              <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.25)', border: '3px solid rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div className="spin" style={{ width: 28, height: 28, borderColor: 'rgba(255,255,255,0.4)', borderTopColor: 'white' }} />
+              </div>
+            ) : avatarUrl ? (
+              <img src={avatarUrl} alt="avatar" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.6)' }} />
+            ) : (
+              <div className="av" style={{ width: 80, height: 80, fontSize: 28, background: 'rgba(255,255,255,0.25)', border: '3px solid rgba(255,255,255,0.5)' }}>{init}</div>
+            )}
+            {!avatarUploading && <div className="av-overlay">📷</div>}
           </label>
           <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 22, color: 'white', marginBottom: 4 }}>{user.name}</h2>
           <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, marginBottom: 20 }}>{user.email}</p>
@@ -218,8 +241,23 @@ export default function ProfilePage() {
               <button className={`tab ${tab === 'drafts' ? 'on' : ''}`} onClick={() => setTab('drafts')}>💾 Drafts ({drafts.length})</button>
             </div>
 
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: 48 }}><div className="spin" style={{ margin: '0 auto' }} /></div>
+            {loading || profileLoading ? (
+              /* Full skeleton for all tabs */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[0,1,2,3].map(i => (
+                  <div key={i} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div className="skeleton" style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0 }} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div className="skeleton" style={{ height: 14, width: '65%', borderRadius: 6 }} />
+                      <div className="skeleton" style={{ height: 11, width: '45%', borderRadius: 6 }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div className="skeleton" style={{ width: 64, height: 32, borderRadius: 50 }} />
+                      <div className="skeleton" style={{ width: 36, height: 32, borderRadius: 50 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : tab === 'songs' ? (
               /* ── MY SONGS ── */
               songs.length === 0 ? (

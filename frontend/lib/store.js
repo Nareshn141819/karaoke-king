@@ -1,7 +1,8 @@
 // Safe localStorage helpers — all SSR-guarded
 const isBrowser = () => typeof window !== 'undefined'
-import { db, auth, googleProvider } from './firebase'
-import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, limit, where } from 'firebase/firestore'
+import { db, auth, googleProvider, storage } from './firebase'
+import { collection, addDoc, getDocs, deleteDoc, doc, getDoc, setDoc, updateDoc, query, orderBy, limit, where } from 'firebase/firestore'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, updatePassword as fbUpdatePasswordInternal } from 'firebase/auth'
 
 export const store = {
@@ -19,7 +20,61 @@ export const store = {
 // Session
 export const getUser = () => store.get('kk_user')
 export const setUser = (u) => store.set('kk_user', u)
-export const logout = () => store.del('kk_user')
+export const logout  = () => { store.del('kk_user'); store.del('kk_profile') }
+
+// ── Firebase user profile (Firestore: users/{uid}) ──────────────
+// Shape: { uid, name, email, photoUrl, songsAdded, performances, drafts, followers: [] }
+export async function getProfile(uid) {
+  if (!uid) return null
+  try {
+    const snap = await getDoc(doc(db, 'users', uid))
+    if (snap.exists()) return snap.data()
+  } catch { }
+  return null
+}
+
+export async function upsertProfile(uid, fields) {
+  if (!uid) return
+  try {
+    const ref = doc(db, 'users', uid)
+    const snap = await getDoc(ref)
+    if (snap.exists()) {
+      await updateDoc(ref, fields)
+    } else {
+      await setDoc(ref, { uid, followers: [], songsAdded: 0, performances: 0, drafts: 0, ...fields })
+    }
+    // Update local cache
+    const local = getUser()
+    if (local && local.uid === uid) {
+      setUser({ ...local, ...fields })
+    }
+  } catch (e) { console.warn('upsertProfile error', e) }
+}
+
+export async function uploadAvatar(uid, file) {
+  if (!uid || !file) return null
+  try {
+    const storageRef = ref(storage, `avatars/${uid}/avatar.jpg`)
+    await uploadBytes(storageRef, file, { contentType: 'image/jpeg' })
+    const url = await getDownloadURL(storageRef)
+    // Persist in Firestore profile + local user cache
+    await upsertProfile(uid, { photoUrl: url })
+    return url
+  } catch (e) { console.warn('uploadAvatar error', e); return null }
+}
+
+export async function followUser(currentUid, targetUid) {
+  if (!currentUid || !targetUid) return
+  try {
+    const ref = doc(db, 'users', targetUid)
+    const snap = await getDoc(ref)
+    const data = snap.exists() ? snap.data() : {}
+    const followers = data.followers || []
+    const already = followers.includes(currentUid)
+    await updateDoc(ref, { followers: already ? followers.filter(u => u !== currentUid) : [...followers, currentUid] })
+    return !already // returns new follow state
+  } catch { return false }
+}
 
 // Local private feed (legacy / personal)
 export const getFeed = () => store.get('kk_feed') || []

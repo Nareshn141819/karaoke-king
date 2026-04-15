@@ -24,15 +24,18 @@ export default function FeedPage() {
   const [deleting, setDeleting] = useState(null)
   const [songSearch, setSongSearch] = useState('')  // search query for songs tab
   const [following, setFollowing] = useState(getFollowing())
+  const [feedLoading, setFeedLoading] = useState(true)
+  const [songsLoading, setSongsLoading] = useState(true)
 
   useEffect(() => {
     const u = getUser()
     setUser(u)
-    getCommunityFeed().then(feed => setPerfs(feed))
+    getCommunityFeed().then(feed => setPerfs(feed)).finally(() => setFeedLoading(false))
     fetch(`${API}/api/songs`)
       .then(r => r.ok ? r.json() : { songs: [] })
       .then(d => setSongs(d.songs || []))
       .catch(() => { })
+      .finally(() => setSongsLoading(false))
   }, [])
 
   const removePerf = async (id, docId) => {
@@ -72,7 +75,24 @@ export default function FeedPage() {
 
         {/* ── PERFORMANCES TAB ── */}
         {tab === 'perfs' && (
-          perfs.length === 0 ? (
+          feedLoading ? (
+            /* Skeleton for performances */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {[0,1,2].map(i => (
+                <div key={i} className="card" style={{ padding: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                    <div className="skeleton" style={{ width: 44, height: 44, borderRadius: '50%' }} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div className="skeleton" style={{ height: 13, width: '55%', borderRadius: 6 }} />
+                      <div className="skeleton" style={{ height: 10, width: '35%', borderRadius: 6 }} />
+                    </div>
+                  </div>
+                  <div className="skeleton" style={{ height: 160, borderRadius: 12, marginBottom: 12 }} />
+                  <div className="skeleton" style={{ height: 11, width: '80%', borderRadius: 6 }} />
+                </div>
+              ))}
+            </div>
+          ) : perfs.length === 0 ? (
             <div className="card" style={{ padding: 48, textAlign: 'center' }}>
               <div style={{ fontSize: 52, marginBottom: 14 }}>🎤</div>
               <p style={{ color: 'var(--text2)', marginBottom: 8, fontWeight: 700, fontSize: 16 }}>No performances yet!</p>
@@ -95,7 +115,23 @@ export default function FeedPage() {
 
         {/* ── SONGS TAB ── */}
         {tab === 'songs' && (
-          songs.length === 0 ? (
+          songsLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[0,1,2,3].map(i => (
+                <div key={i} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div className="skeleton" style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0 }} />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div className="skeleton" style={{ height: 13, width: '60%', borderRadius: 6 }} />
+                    <div className="skeleton" style={{ height: 10, width: '40%', borderRadius: 6 }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div className="skeleton" style={{ width: 70, height: 32, borderRadius: 50 }} />
+                    <div className="skeleton" style={{ width: 36, height: 32, borderRadius: 50 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : songs.length === 0 ? (
             <div className="card" style={{ padding: 48, textAlign: 'center' }}>
               <div style={{ fontSize: 52, marginBottom: 14 }}>🎵</div>
               <p style={{ color: 'var(--text2)', marginBottom: 16 }}>No songs uploaded yet</p>
