@@ -2,6 +2,21 @@
 import { useState, useEffect } from 'react'
 import { getUser, getProfile } from '../lib/store'
 
+// Inline person SVG avatar (gradient background, no letters)
+const NavPersonAvatar = ({ size = 34 }) => (
+  <svg width={size} height={size} viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: '50%', display: 'block', border: '2px solid var(--purple)' }}>
+    <circle cx="17" cy="17" r="17" fill="url(#nav_av_g)" />
+    <circle cx="17" cy="13" r="5.5" fill="rgba(255,255,255,0.85)" />
+    <ellipse cx="17" cy="26" rx="8.5" ry="5.5" fill="rgba(255,255,255,0.85)" />
+    <defs>
+      <linearGradient id="nav_av_g" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#FF4E8A" />
+        <stop offset="1" stopColor="#9B5CF6" />
+      </linearGradient>
+    </defs>
+  </svg>
+)
+
 // Skeleton variant — shows shimmer placeholder for the entire navbar
 export function NavbarSkeleton() {
   return (
@@ -29,6 +44,7 @@ export function NavbarSkeleton() {
 export default function Navbar() {
   const [user, setUser] = useState(null)
   const [photoUrl, setPhotoUrl] = useState(null)
+  const [photoErr, setPhotoErr] = useState(false)
 
   useEffect(() => {
     const u = getUser()
@@ -36,7 +52,7 @@ export default function Navbar() {
     if (u?.uid) {
       if (u.photoUrl) setPhotoUrl(u.photoUrl)
       getProfile(u.uid).then(profile => {
-        if (profile?.photoUrl) setPhotoUrl(profile.photoUrl)
+        if (profile?.photoUrl) { setPhotoUrl(profile.photoUrl); setPhotoErr(false) }
       }).catch(() => {})
     }
   }, [])
@@ -58,13 +74,14 @@ export default function Navbar() {
           <>
             <a href="/upload" className="btn btn-grad" style={{ padding: '7px 16px', fontSize: 13 }}>+ Upload</a>
             <a href="/profile" style={{ display: 'block', flexShrink: 0 }}>
-              {photoUrl
-                ? <img src={photoUrl} alt="profile"
+              {photoUrl && !photoErr
+                ? <img
+                    src={photoUrl}
+                    alt="profile"
                     style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--purple)', display: 'block' }}
+                    onError={() => setPhotoErr(true)}
                   />
-                : <div className="av" style={{ width: 34, height: 34, fontSize: 13 }}>
-                    {(user.name || 'U')[0].toUpperCase()}
-                  </div>
+                : <NavPersonAvatar size={34} />
               }
             </a>
           </>

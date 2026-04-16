@@ -46,30 +46,65 @@ export default function Studio({ song, onDone, onBack }) {
   }, [])
 
   // Earphone / headphone detection
+  // Browsers hide device labels until microphone permission is granted.
+  // We request a minimal mic stream to unlock labels, then immediately stop it.
   useEffect(() => {
+    let tempStream = null
+
     const detect = async () => {
       try {
+        // Step 1: Request mic permission briefly to unlock device labels
+        if (typeof navigator?.mediaDevices?.getUserMedia === 'function') {
+          try {
+            tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+          } catch {
+            // Permission denied or already granted — continue anyway
+          }
+        }
+
+        // Step 2: Enumerate devices (labels now available if permission was granted)
         const devices = await navigator.mediaDevices.enumerateDevices()
-        // Look for any audio output that is NOT the default built-in speaker
+
+        // Step 3: Stop the temp mic stream immediately
+        if (tempStream) {
+          tempStream.getTracks().forEach(t => t.stop())
+          tempStream = null
+        }
+
         const audioOutputs = devices.filter(d => d.kind === 'audiooutput')
-        // heuristic: if label contains headphone/earphone/bluetooth/wired keywords, or
-        // there are multiple audio outputs (built-in + external) treat as connected
-        const hasExternal = audioOutputs.some(d => {
+
+        // Check for external audio outputs by label keywords
+        const EXTERNAL_KEYWORDS = [
+          'headphone', 'earphone', 'bluetooth', 'bt ', ' bt',
+          'wireless', 'wired', 'usb', 'external', 'airpod',
+          'headset', 'speaker (', 'buds', 'galaxy buds',
+        ]
+        const hasExternalByLabel = audioOutputs.some(d => {
           const lbl = (d.label || '').toLowerCase()
-          return lbl.includes('headphone') || lbl.includes('earphone') ||
-            lbl.includes('bluetooth') || lbl.includes('wired') ||
-            lbl.includes('usb') || lbl.includes('external') || lbl.includes('airpod')
+          return EXTERNAL_KEYWORDS.some(kw => lbl.includes(kw))
         })
-        // If we can't read labels (no permission), fall back to checking device count
-        const connected = hasExternal || audioOutputs.length > 1
+
+        // Fallback: if there are at least 2 audiooutput devices, one is likely external
+        // (most laptops/phones only have 1 built-in when nothing is connected)
+        const hasMultipleOutputs = audioOutputs.length >= 2
+
+        const connected = hasExternalByLabel || hasMultipleOutputs
         setEarphoneConnected(connected)
         if (connected) setMon(true)
-      } catch { setEarphoneConnected(false) }
+      } catch {
+        setEarphoneConnected(false)
+      }
     }
+
     detect()
-    // Re-check when devices change (plug/unplug)
-    navigator.mediaDevices.addEventListener?.('devicechange', detect)
-    return () => navigator.mediaDevices.removeEventListener?.('devicechange', detect)
+
+    // Re-check when devices change (plug/unplug bluetooth or wired)
+    const handler = () => detect()
+    navigator.mediaDevices?.addEventListener?.('devicechange', handler)
+    return () => {
+      navigator.mediaDevices?.removeEventListener?.('devicechange', handler)
+      if (tempStream) tempStream.getTracks().forEach(t => t.stop())
+    }
   }, [])
 
   const recRef = useRef(null)

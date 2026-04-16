@@ -4,6 +4,21 @@ import Navbar from './Navbar'
 import BottomNav from './BottomNav'
 import PerformanceCard from './PerformanceCard'
 import { getUser, setUser as saveUser, getCommunityFeed, delCommunityFeed, addCommunityFeed, getDrafts, delDraft, logout, fbUpdateName, fbUpdatePassword, getProfile, upsertProfile, uploadAvatar } from '../lib/store'
+
+// Generic person SVG avatar
+const PersonAvatar = ({ size = 80, style = {} }) => (
+  <svg width={size} height={size} viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: '50%', ...style }}>
+    <circle cx="40" cy="40" r="40" fill="url(#av_grad)" />
+    <circle cx="40" cy="30" r="13" fill="rgba(255,255,255,0.85)" />
+    <ellipse cx="40" cy="62" rx="20" ry="13" fill="rgba(255,255,255,0.85)" />
+    <defs>
+      <linearGradient id="av_grad" x1="0" y1="0" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#FF4E8A" />
+        <stop offset="1" stopColor="#9B5CF6" />
+      </linearGradient>
+    </defs>
+  </svg>
+)
 const API = process.env.NEXT_PUBLIC_API || 'http://localhost:5000'
 
 // SVG icons
@@ -31,6 +46,7 @@ export default function ProfilePage() {
   const [tab, setTab] = useState('songs')
   const [loading, setLoading] = useState(true)
   const [postingDraft, setPostingDraft] = useState(null)
+  const [pageReady, setPageReady] = useState(false)  // true once user is resolved
 
   const [showSettings, setShowSettings] = useState(false)
   const [newName, setNewName] = useState('')
@@ -40,6 +56,7 @@ export default function ProfilePage() {
   const [sLoad, setSLoad] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState('')
   const [following, setFollowing] = useState([])
   const [followersCount, setFollowersCount] = useState(0)
   const [profileLoading, setProfileLoading] = useState(true)
@@ -51,6 +68,7 @@ export default function ProfilePage() {
     setNewName(u.name || '')
     setAvatarUrl(u.photoUrl || null)
     setFollowing(getFollowing())
+    setPageReady(true)  // user is resolved — show page skeleton
 
     // Fetch Firestore profile
     getProfile(u.uid).then(profile => {
@@ -111,21 +129,39 @@ export default function ProfilePage() {
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file || !user?.uid) return
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setUploadErr('Please select a valid image file (JPG, PNG, WEBP, etc.)')
+      return
+    }
+    // Validate file size (max 5 MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadErr('Image is too large. Please use an image under 5 MB.')
+      return
+    }
+    setUploadErr('')
     setAvatarUploading(true)
     try {
       const url = await uploadAvatar(user.uid, file)
       if (url) {
         setAvatarUrl(url)
         saveUser({ ...user, photoUrl: url })
-        // Also sync stats to Firestore while we're here
         await upsertProfile(user.uid, {
           name: user.name,
           email: user.email,
           photoUrl: url,
         })
+      } else {
+        setUploadErr('Upload failed. Please try again.')
       }
-    } catch (e) { console.warn(e) }
-    finally { setAvatarUploading(false) }
+    } catch (err) {
+      console.warn('Avatar upload error:', err)
+      setUploadErr('Upload failed: ' + (err?.message || 'Unknown error'))
+    } finally {
+      setAvatarUploading(false)
+      // Reset file input so the same file can be re-selected
+      e.target.value = ''
+    }
   }
 
   const handleUpdateName = async () => {
@@ -150,16 +186,17 @@ export default function ProfilePage() {
     finally { setSLoad(false) }
   }
 
-  if (!user) return (
+  // Show skeleton only while user session is being resolved (brief flash)
+  if (!pageReady) return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <Navbar />
       <div style={{ maxWidth: 700, margin: '0 auto', padding: 'calc(var(--nav) + 20px) 16px calc(var(--bot) + 24px)' }}>
         {/* Skeleton hero card */}
-        <div className="skeleton" style={{ borderRadius: 24, height: 340, marginBottom: 20 }} />
+        <div className="skeleton" style={{ borderRadius: 24, height: 280, marginBottom: 20 }} />
         {/* Skeleton tabs */}
         <div className="skeleton" style={{ borderRadius: 12, height: 44, marginBottom: 20 }} />
         {/* Skeleton list items */}
-        {[0,1,2,3].map(i => (
+        {[0,1,2].map(i => (
           <div key={i} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
             <div className="skeleton" style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0 }} />
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -210,12 +247,22 @@ export default function ProfilePage() {
                 <div className="spin" style={{ width: 28, height: 28, borderColor: 'rgba(255,255,255,0.4)', borderTopColor: 'white' }} />
               </div>
             ) : avatarUrl ? (
-              <img src={avatarUrl} alt="avatar" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.6)' }} />
+              <img
+                src={avatarUrl}
+                alt="avatar"
+                style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.6)' }}
+                onError={() => setAvatarUrl(null)} /* if image fails to load, fall back to icon */
+              />
             ) : (
-              <div className="av" style={{ width: 80, height: 80, fontSize: 28, background: 'rgba(255,255,255,0.25)', border: '3px solid rgba(255,255,255,0.5)' }}>{init}</div>
+              <PersonAvatar size={80} style={{ border: '3px solid rgba(255,255,255,0.5)', boxSizing: 'border-box' }} />
             )}
             {!avatarUploading && <div className="av-overlay">📷</div>}
           </label>
+          {uploadErr && (
+            <div style={{ background: 'rgba(255,255,255,0.9)', color: '#E0284A', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 700, marginBottom: 10, maxWidth: 280, margin: '0 auto 10px', textAlign: 'center', backdropFilter: 'blur(4px)' }}>
+              ⚠️ {uploadErr}
+            </div>
+          )}
           <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 22, color: 'white', marginBottom: 4 }}>{user.name}</h2>
           <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, marginBottom: 20 }}>{user.email}</p>
 

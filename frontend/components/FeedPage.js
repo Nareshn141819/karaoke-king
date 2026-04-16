@@ -120,19 +120,56 @@ export default function FeedPage() {
             <div className="card" style={{ padding: 48, textAlign: 'center' }}>
               <div style={{ fontSize: 52, marginBottom: 14 }}>🎤</div>
               <p style={{ color: 'var(--text2)', marginBottom: 8, fontWeight: 700, fontSize: 16 }}>No performances yet!</p>
-              <p style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 20 }}>Record a song and tap "Post to Community" on the results screen.</p>
-              <a href="/" className="btn btn-grad" style={{ padding: '11px 24px', fontSize: 14, textDecoration: 'none' }}>Start Singing</a>
+              <p style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 20 }}>
+                Be the first to share your performance with the community.
+              </p>
+              <a href={user ? '/' : '/login'} className="btn btn-grad" style={{ padding: '11px 24px', fontSize: 14, textDecoration: 'none' }}>
+                {user ? '🎤 Start Singing' : '🔐 Sign In to Sing'}
+              </a>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Community header banner */}
+              <div style={{
+                borderRadius: 16,
+                background: 'linear-gradient(135deg, rgba(255,78,138,0.08), rgba(155,92,246,0.08))',
+                border: '1px solid rgba(155,92,246,0.18)',
+                padding: '12px 18px',
+                display: 'flex', alignItems: 'center', gap: 12,
+              }}>
+                <div style={{ fontSize: 28 }}>🌟</div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>Community Performances</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 1 }}>
+                    {perfs.length} {perfs.length === 1 ? 'singer has' : 'singers have'} shared their talent
+                  </div>
+                </div>
+              </div>
+
               {perfs.map(it => (
                 <PerformanceCard
                   key={it.id}
                   item={it}
                   currentUser={user}
-                  onDelete={() => removePerf(it.id, it.docId)}
+                  onDelete={user && user.uid === it.uid ? () => removePerf(it.id, it.docId) : null}
                 />
               ))}
+
+              {/* Guest nudge at bottom */}
+              {!user && (
+                <div style={{
+                  textAlign: 'center', padding: '20px 16px',
+                  borderRadius: 16, border: '1.5px dashed var(--border)',
+                  background: 'white',
+                }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🎤</div>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>Want to share yours?</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14 }}>Sign in to record and post your performance</div>
+                  <a href="/login" className="btn btn-grad" style={{ padding: '10px 24px', fontSize: 13, textDecoration: 'none' }}>
+                    Sign In / Sign Up
+                  </a>
+                </div>
+              )}
             </div>
           )
         )}
