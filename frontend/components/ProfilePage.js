@@ -46,7 +46,7 @@ export default function ProfilePage() {
   const [tab, setTab] = useState('songs')
   const [loading, setLoading] = useState(true)
   const [postingDraft, setPostingDraft] = useState(null)
-  const [pageReady, setPageReady] = useState(false)  // true once user is resolved
+  const [pageReady, setPageReady] = useState(false)
 
   const [showSettings, setShowSettings] = useState(false)
   const [newName, setNewName] = useState('')
@@ -60,6 +60,10 @@ export default function ProfilePage() {
   const [following, setFollowing] = useState([])
   const [followersCount, setFollowersCount] = useState(0)
   const [profileLoading, setProfileLoading] = useState(true)
+  // Avatar UI state
+  const [showImgViewer, setShowImgViewer] = useState(false)   // fullscreen image preview
+  const [showAvatarMenu, setShowAvatarMenu] = useState(false) // Change / Remove dropdown
+  const fileInputRef = useState(null)
 
   useEffect(() => {
     const u = getUser()
@@ -125,32 +129,27 @@ export default function ProfilePage() {
 
   const signOut = () => { logout(); window.location.href = '/' }
 
-  // Profile picture handler — uploads to Firebase Storage
+  // Upload new profile picture
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file || !user?.uid) return
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       setUploadErr('Please select a valid image file (JPG, PNG, WEBP, etc.)')
       return
     }
-    // Validate file size (max 5 MB)
     if (file.size > 5 * 1024 * 1024) {
       setUploadErr('Image is too large. Please use an image under 5 MB.')
       return
     }
     setUploadErr('')
     setAvatarUploading(true)
+    setShowAvatarMenu(false)
     try {
       const url = await uploadAvatar(user.uid, file)
       if (url) {
         setAvatarUrl(url)
         saveUser({ ...user, photoUrl: url })
-        await upsertProfile(user.uid, {
-          name: user.name,
-          email: user.email,
-          photoUrl: url,
-        })
+        await upsertProfile(user.uid, { name: user.name, email: user.email, photoUrl: url })
       } else {
         setUploadErr('Upload failed. Please try again.')
       }
@@ -159,9 +158,19 @@ export default function ProfilePage() {
       setUploadErr('Upload failed: ' + (err?.message || 'Unknown error'))
     } finally {
       setAvatarUploading(false)
-      // Reset file input so the same file can be re-selected
       e.target.value = ''
     }
+  }
+
+  // Remove profile picture → revert to default avatar
+  const handleRemoveAvatar = async () => {
+    if (!user?.uid) return
+    setShowAvatarMenu(false)
+    setAvatarUrl(null)
+    saveUser({ ...user, photoUrl: null })
+    try {
+      await upsertProfile(user.uid, { photoUrl: null })
+    } catch (err) { console.warn('Remove avatar error:', err) }
   }
 
   const handleUpdateName = async () => {
@@ -213,13 +222,12 @@ export default function ProfilePage() {
   const init = (user.name || 'U').slice(0, 2).toUpperCase()
   const followingCount = following.length
 
-  // Instagram-style stat items
+  // Stats row — Drafts removed
   const statItems = [
     { label: 'Songs',     value: songs.length },
     { label: 'Followers', value: followersCount },
     { label: 'Following', value: followingCount },
     { label: 'Perfs',     value: perfs.length },
-    { label: 'Drafts',    value: drafts.length },
   ]
 
   return (
@@ -227,37 +235,139 @@ export default function ProfilePage() {
       <Navbar />
       <div style={{ maxWidth: 700, margin: '0 auto', padding: 'calc(var(--nav) + 20px) 16px calc(var(--bot) + 24px)' }}>
 
+        {/* ── Fullscreen image viewer ── */}
+        {showImgViewer && avatarUrl && (
+          <div
+            onClick={() => setShowImgViewer(false)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 9999,
+              background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(8px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'zoom-out',
+            }}
+          >
+            <img
+              src={avatarUrl}
+              alt="Profile"
+              style={{
+                maxWidth: '88vw', maxHeight: '88vh', borderRadius: 20,
+                objectFit: 'contain', boxShadow: '0 20px 80px rgba(0,0,0,0.6)',
+                border: '3px solid rgba(255,255,255,0.15)',
+              }}
+            />
+            <button
+              onClick={() => setShowImgViewer(false)}
+              style={{
+                position: 'absolute', top: 20, right: 20,
+                background: 'rgba(255,255,255,0.15)', border: 'none',
+                color: 'white', width: 40, height: 40, borderRadius: '50%',
+                cursor: 'pointer', fontSize: 20, display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                backdropFilter: 'blur(4px)',
+              }}
+            >✕</button>
+          </div>
+        )}
+
         {/* Profile hero */}
-        <div style={{ borderRadius: 24, background: 'var(--grad)', padding: '32px 24px 28px', textAlign: 'center', marginBottom: 20, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: -20, right: -20, fontSize: 100, opacity: 0.08, pointerEvents: 'none' }}>👤</div>
+        <div style={{ borderRadius: 24, background: 'var(--grad)', padding: '32px 24px 28px', textAlign: 'center', marginBottom: 20, position: 'relative', overflow: 'visible' }}>
+          <div style={{ position: 'absolute', top: -20, right: -20, fontSize: 100, opacity: 0.08, pointerEvents: 'none', overflow:'hidden', borderRadius:24 }}>👤</div>
 
           <button
             onClick={() => setShowSettings(!showSettings)}
-            style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}
+            style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, zIndex: 2 }}
             title="Settings"
           >
             ⚙️
           </button>
 
-          {/* Clickable avatar — tap to upload photo */}
-          <label className="av-upload" style={{ margin: '0 auto 14px', display: 'block', width: 80, height: 80 }}>
-            <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} />
-            {avatarUploading ? (
-              <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.25)', border: '3px solid rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div className="spin" style={{ width: 28, height: 28, borderColor: 'rgba(255,255,255,0.4)', borderTopColor: 'white' }} />
+          {/* ── Instagram-style Avatar with edit badge ── */}
+          <div style={{ position: 'relative', width: 96, height: 96, margin: '0 auto 14px' }}>
+            {/* Hidden file input */}
+            <input
+              id="avatar-file-input"
+              type="file" accept="image/*"
+              onChange={handleAvatarChange}
+              style={{ display: 'none' }}
+            />
+
+            {/* Avatar circle — click to view full image */}
+            <div
+              onClick={() => avatarUrl && setShowImgViewer(true)}
+              style={{ cursor: avatarUrl ? 'zoom-in' : 'default', width: 96, height: 96, borderRadius: '50%', overflow: 'hidden', border: '3px solid rgba(255,255,255,0.65)', boxShadow: '0 4px 20px rgba(0,0,0,0.25)', flexShrink: 0 }}
+            >
+              {avatarUploading ? (
+                <div style={{ width: '100%', height: '100%', background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="spin" style={{ width: 30, height: 30, borderColor: 'rgba(255,255,255,0.4)', borderTopColor: 'white' }} />
+                </div>
+              ) : avatarUrl ? (
+                <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={() => setAvatarUrl(null)} />
+              ) : (
+                <PersonAvatar size={96} style={{ borderRadius: '50%' }} />
+              )}
+            </div>
+
+            {/* Edit pencil badge — bottom right */}
+            {!avatarUploading && (
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowAvatarMenu(v => !v)}
+                  style={{
+                    position: 'absolute', bottom: -4, right: -4,
+                    width: 30, height: 30, borderRadius: '50%', border: '2.5px solid white',
+                    background: 'linear-gradient(135deg,#1877F2,#0056D6)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.35)', zIndex: 3,
+                  }}
+                  title="Edit photo"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </button>
+
+                {/* Dropdown menu */}
+                {showAvatarMenu && (
+                  <div
+                    style={{
+                      position: 'absolute', bottom: 32, right: -48,
+                      background: 'white', borderRadius: 14, padding: '6px 0',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.22)',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                      minWidth: 170, zIndex: 100,
+                      animation: 'menuIn 0.18s cubic-bezier(0.34,1.56,0.64,1)',
+                    }}
+                  >
+                    <button
+                      onClick={() => { document.getElementById('avatar-file-input').click(); setShowAvatarMenu(false) }}
+                      style={{ width: '100%', padding: '11px 18px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10, fontFamily: "'Nunito',sans-serif" }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      📷 Change Image
+                    </button>
+                    {avatarUrl && (
+                      <button
+                        onClick={handleRemoveAvatar}
+                        style={{ width: '100%', padding: '11px 18px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#E0284A', display: 'flex', alignItems: 'center', gap: 10, fontFamily: "'Nunito',sans-serif" }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#FFF0F2'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        🗑 Remove Image
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            ) : avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt="avatar"
-                style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.6)' }}
-                onError={() => setAvatarUrl(null)} /* if image fails to load, fall back to icon */
-              />
-            ) : (
-              <PersonAvatar size={80} style={{ border: '3px solid rgba(255,255,255,0.5)', boxSizing: 'border-box' }} />
             )}
-            {!avatarUploading && <div className="av-overlay">📷</div>}
-          </label>
+          </div>
+
+          {/* Close menu on outside click */}
+          {showAvatarMenu && (
+            <div onClick={() => setShowAvatarMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+          )}
+
           {uploadErr && (
             <div style={{ background: 'rgba(255,255,255,0.9)', color: '#E0284A', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 700, marginBottom: 10, maxWidth: 280, margin: '0 auto 10px', textAlign: 'center', backdropFilter: 'blur(4px)' }}>
               ⚠️ {uploadErr}

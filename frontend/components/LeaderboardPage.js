@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import Navbar from './Navbar'
 import BottomNav from './BottomNav'
-import { getCommunityFeed } from '../lib/store'
+import { getCommunityFeed, getUser } from '../lib/store'
 
 const RS = {
   Platinum: { c: '#7C3AED', bg: '#F5F0FF', bd: '#C4B5FD', e: '💎' },
@@ -22,6 +22,9 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Require sign-in
+    if (!getUser()) { window.location.href = '/login'; return }
+
     getCommunityFeed()
       .then(feed => {
         // Aggregate: keep each user's best score

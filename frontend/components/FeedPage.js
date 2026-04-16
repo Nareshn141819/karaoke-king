@@ -39,13 +39,15 @@ export default function FeedPage() {
   const [tab, setTab] = useState('perfs')
   const [user, setUser] = useState(null)
   const [deleting, setDeleting] = useState(null)
-  const [songSearch, setSongSearch] = useState('')  // search query for songs tab
+  const [songSearch, setSongSearch] = useState('')
   const [following, setFollowing] = useState(getFollowing())
   const [feedLoading, setFeedLoading] = useState(true)
   const [songsLoading, setSongsLoading] = useState(true)
 
   useEffect(() => {
     const u = getUser()
+    // Require sign-in to access community feed
+    if (!u) { window.location.href = '/login'; return }
     setUser(u)
 
     // Read ?tab=songs from URL to default to Songs tab
@@ -154,22 +156,6 @@ export default function FeedPage() {
                   onDelete={user && user.uid === it.uid ? () => removePerf(it.id, it.docId) : null}
                 />
               ))}
-
-              {/* Guest nudge at bottom */}
-              {!user && (
-                <div style={{
-                  textAlign: 'center', padding: '20px 16px',
-                  borderRadius: 16, border: '1.5px dashed var(--border)',
-                  background: 'white',
-                }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🎤</div>
-                  <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>Want to share yours?</div>
-                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14 }}>Sign in to record and post your performance</div>
-                  <a href="/login" className="btn btn-grad" style={{ padding: '10px 24px', fontSize: 13, textDecoration: 'none' }}>
-                    Sign In / Sign Up
-                  </a>
-                </div>
-              )}
             </div>
           )
         )}

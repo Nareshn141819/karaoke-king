@@ -5,6 +5,7 @@ import BottomNav from './BottomNav'
 import SearchBar from './SearchBar'
 import Studio from './Studio'
 import Results from './Results'
+import { getUser } from '../lib/store'
 
 // Set NEXT_PUBLIC_API in Vercel env vars to your backend URL (e.g. Railway)
 const API = process.env.NEXT_PUBLIC_API || 'http://localhost:5000'
@@ -61,7 +62,20 @@ export default function App() {
       .finally(() => setSongsLoading(false))
   }, [])
 
-  const goSing = (s) => { setSong(s); setView('studio'); setQsArtist(null); setQsResults([]) }
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    setUser(getUser())
+  }, [])
+
+  const goSing = (s) => {
+    // Require sign-in to sing
+    if (typeof window !== 'undefined') {
+      const u = getUser()
+      if (!u) { window.location.href = '/login'; return }
+    }
+    setSong(s); setView('studio'); setQsArtist(null); setQsResults([])
+  }
 
   const openQuickSearch = async (artist) => {
     if (qsArtist === artist) { setQsArtist(null); setQsResults([]); return }
