@@ -345,11 +345,11 @@ export async function fbUpdatePassword(newPass) {
 function friendlyErr(msg = '') {
   msg = msg.toUpperCase()
   if (msg.includes('EMAIL_EXISTS') || msg.includes('EMAIL-ALREADY')) return 'Email already registered'
-  if (msg.includes('INVALID_LOGIN') || msg.includes('WRONG-PASSWORD') || msg.includes('USER-NOT-FOUND')) return 'Invalid email or password'
+  if (msg.includes('INVALID_LOGIN') || msg.includes('WRONG-PASSWORD') || msg.includes('USER-NOT-FOUND') || msg.includes('INVALID_CREDENTIAL') || msg.includes('INVALID-CREDENTIAL')) return 'Invalid email or password'
   if (msg.includes('INVALID_PASSWORD')) return 'Invalid email or password'
   if (msg.includes('TOO_MANY_ATTEMPTS')) return 'Too many attempts – try later'
   if (msg.includes('WEAK_PASSWORD') || msg.includes('WEAK-PASSWORD')) return 'Password needs 6+ characters'
   if (msg.includes('INVALID_EMAIL') || msg.includes('INVALID-EMAIL')) return 'Invalid email address'
   if (msg.includes('USER_NOT_FOUND')) return 'No account found with that email'
-  return 'Something went wrong. Please try again.'
+  return msg + ' (Something went wrong. Please try again.)'
 }
