@@ -149,7 +149,8 @@ async function getAudioUrl(videoId) {
       ytUrl,
       '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio',
       '--get-url', '--no-playlist', '--quiet',
-      '--extractor-args', 'youtube:player_client=android,web',
+      '--extractor-args', 'youtube:player_client=ios,android,tv',
+      '--js-runtimes', 'node:' + (process.execPath || 'node'),
       '--force-ipv4',
       '--no-warnings'
     ])
