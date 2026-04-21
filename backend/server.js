@@ -151,6 +151,7 @@ async function getAudioUrl(videoId) {
       '--get-url', '--no-playlist', '--quiet',
       '--extractor-args', 'youtube:player_client=ios,android,tv',
       '--js-runtimes', 'node:' + (process.execPath || 'node'),
+      ...(fs.existsSync(path.join(__dirname, 'cookies.txt')) ? ['--cookies', path.join(__dirname, 'cookies.txt')] : []),
       '--force-ipv4',
       '--no-warnings'
     ])
