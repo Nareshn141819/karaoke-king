@@ -138,11 +138,33 @@ if (!fs.existsSync(YT_DLP)) {
 
 const audioUrlCache = new Map() // videoId → { url, exp }
 
+const PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.syncpundit.io',
+  'https://pipedapi.tokhmi.xyz'
+]
+
 async function getAudioUrl(videoId) {
   const now = Date.now()
   const cached = audioUrlCache.get(videoId)
   if (cached && now < cached.exp) return cached.url
 
+  // 1. Try Piped Proxies (Ultra-fast & Bypasses BotGuard)
+  const fetch = require('node-fetch')
+  for (const api of PIPED_INSTANCES) {
+    try {
+      const r = await fetch(`${api}/streams/${videoId}`, { timeout: 4000 })
+      if (!r.ok) continue
+      const data = await r.json()
+      const stream = data.audioStreams?.find(s => s.mimeType.includes('mp4') || s.mimeType.includes('webm'))
+      if (stream && stream.url) {
+         audioUrlCache.set(videoId, { url: stream.url, exp: now + 50 * 60 * 1000 })
+         return stream.url
+      }
+    } catch (e) { /* skip to next instance */ }
+  }
+
+  // 2. Fallback to yt-dlp
   const ytUrl = `https://www.youtube.com/watch?v=${videoId}`
   const url = await new Promise((resolve, reject) => {
     const proc = spawn(YT_DLP, [

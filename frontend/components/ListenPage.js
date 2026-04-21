@@ -28,18 +28,18 @@ const ChevronDownIcon = () => <svg width="22" height="22" viewBox="0 0 24 24" fi
 
 // ── Trending ──────────────────────────────────────────────────────
 const TRENDING_SONGS = [
-  { title: 'Phir Se Ud Chala', artist: 'Mohit Chauhan', query: 'Phir Se Ud Chala Rockstar', thumbnail: 'https://img.youtube.com/vi/AhFGHs7NhtU/hqdefault.jpg' },
-  { title: 'Tum Hi Ho', artist: 'Arijit Singh', query: 'Tum Hi Ho Full Song', thumbnail: 'https://img.youtube.com/vi/Umqb9KENgmk/hqdefault.jpg' },
-  { title: 'Kesariya', artist: 'Arijit Singh', query: 'Kesariya Full Song', thumbnail: 'https://img.youtube.com/vi/BddP6PYo2gs/hqdefault.jpg' },
-  { title: 'Apna Bana Le', artist: 'Arijit Singh', query: 'Apna Bana Le Full Song', thumbnail: 'https://img.youtube.com/vi/e-mMFgVEfSQ/hqdefault.jpg' },
-  { title: 'Chaleya', artist: 'Arijit Singh', query: 'Chaleya Full Song Jawan', thumbnail: 'https://img.youtube.com/vi/bqjK4Hce5o0/hqdefault.jpg' },
-  { title: 'Raataan Lambiyan', artist: 'Jubin Nautiyal', query: 'Raataan Lambiyan Full Song', thumbnail: 'https://img.youtube.com/vi/gvyUuxdRdR4/hqdefault.jpg' },
-  { title: 'Let Me Down Slowly', artist: 'Alec Benjamin', query: 'Let Me Down Slowly Alec Benjamin', thumbnail: 'https://img.youtube.com/vi/50VNCymT-Cs/hqdefault.jpg' },
-  { title: 'Shape of You', artist: 'Ed Sheeran', query: 'Shape of You Ed Sheeran', thumbnail: 'https://img.youtube.com/vi/JGwWNGJdvx8/hqdefault.jpg' },
-  { title: 'Blinding Lights', artist: 'The Weeknd', query: 'Blinding Lights The Weeknd', thumbnail: 'https://img.youtube.com/vi/4NRXx6U8ABQ/hqdefault.jpg' },
-  { title: 'Perfect', artist: 'Ed Sheeran', query: 'Perfect Ed Sheeran', thumbnail: 'https://img.youtube.com/vi/2Vv-BfVoq4g/hqdefault.jpg' },
-  { title: 'Tera Ban Jaunga', artist: 'Akhil Sachdeva', query: 'Tera Ban Jaunga Full Song Kabir Singh', thumbnail: 'https://img.youtube.com/vi/3_fzmPhdEno/hqdefault.jpg' },
-  { title: 'Maan Meri Jaan', artist: 'King', query: 'Maan Meri Jaan King', thumbnail: 'https://img.youtube.com/vi/MWP1FPQM3wY/hqdefault.jpg' },
+  { title: 'Phir Se Ud Chala', artist: 'Mohit Chauhan', videoId: 'AhFGHs7NhtU', query: 'Phir Se Ud Chala Rockstar', thumbnail: 'https://img.youtube.com/vi/AhFGHs7NhtU/hqdefault.jpg' },
+  { title: 'Tum Hi Ho', artist: 'Arijit Singh', videoId: 'Umqb9KENgmk', query: 'Tum Hi Ho Full Song', thumbnail: 'https://img.youtube.com/vi/Umqb9KENgmk/hqdefault.jpg' },
+  { title: 'Kesariya', artist: 'Arijit Singh', videoId: 'BddP6PYo2gs', query: 'Kesariya Full Song', thumbnail: 'https://img.youtube.com/vi/BddP6PYo2gs/hqdefault.jpg' },
+  { title: 'Apna Bana Le', artist: 'Arijit Singh', videoId: 'e-mMFgVEfSQ', query: 'Apna Bana Le Full Song', thumbnail: 'https://img.youtube.com/vi/e-mMFgVEfSQ/hqdefault.jpg' },
+  { title: 'Chaleya', artist: 'Arijit Singh', videoId: 'bqjK4Hce5o0', query: 'Chaleya Full Song Jawan', thumbnail: 'https://img.youtube.com/vi/bqjK4Hce5o0/hqdefault.jpg' },
+  { title: 'Raataan Lambiyan', artist: 'Jubin Nautiyal', videoId: 'gvyUuxdRdR4', query: 'Raataan Lambiyan Full Song', thumbnail: 'https://img.youtube.com/vi/gvyUuxdRdR4/hqdefault.jpg' },
+  { title: 'Let Me Down Slowly', artist: 'Alec Benjamin', videoId: '50VNCymT-Cs', query: 'Let Me Down Slowly Alec Benjamin', thumbnail: 'https://img.youtube.com/vi/50VNCymT-Cs/hqdefault.jpg' },
+  { title: 'Shape of You', artist: 'Ed Sheeran', videoId: 'JGwWNGJdvx8', query: 'Shape of You Ed Sheeran', thumbnail: 'https://img.youtube.com/vi/JGwWNGJdvx8/hqdefault.jpg' },
+  { title: 'Blinding Lights', artist: 'The Weeknd', videoId: '4NRXx6U8ABQ', query: 'Blinding Lights The Weeknd', thumbnail: 'https://img.youtube.com/vi/4NRXx6U8ABQ/hqdefault.jpg' },
+  { title: 'Perfect', artist: 'Ed Sheeran', videoId: '2Vv-BfVoq4g', query: 'Perfect Ed Sheeran', thumbnail: 'https://img.youtube.com/vi/2Vv-BfVoq4g/hqdefault.jpg' },
+  { title: 'Tera Ban Jaunga', artist: 'Akhil Sachdeva', videoId: '3_fzmPhdEno', query: 'Tera Ban Jaunga Full Song Kabir Singh', thumbnail: 'https://img.youtube.com/vi/3_fzmPhdEno/hqdefault.jpg' },
+  { title: 'Maan Meri Jaan', artist: 'King', videoId: 'MWP1FPQM3wY', query: 'Maan Meri Jaan King', thumbnail: 'https://img.youtube.com/vi/MWP1FPQM3wY/hqdefault.jpg' },
 ]
 const GENRE_FILTERS = ['All', '🔥 Trending', '❤️ Favorites', '🎵 Bollywood', '🌍 English', '🎸 Rock', '🎹 Chill']
 
