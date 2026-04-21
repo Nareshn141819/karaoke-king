@@ -149,6 +149,9 @@ async function getAudioUrl(videoId) {
       ytUrl,
       '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio',
       '--get-url', '--no-playlist', '--quiet',
+      '--extractor-args', 'youtube:player_client=android,web',
+      '--force-ipv4',
+      '--no-warnings'
     ])
     let out = '', err = ''
     proc.stdout.on('data', d => out += d)
