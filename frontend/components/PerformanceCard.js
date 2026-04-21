@@ -428,12 +428,18 @@ export default function PerformanceCard({ item, currentUser, onDelete, compact =
                     <button
                         onClick={() => onDelete(item.id)}
                         style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
                             padding: '6px 16px', fontSize: 12, border: 'none', borderRadius: 50,
                             background: '#FFF0F2', color: '#E0284A', cursor: 'pointer', fontWeight: 700,
                             transition: 'background 0.15s',
                         }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#FFD9E0'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#FFF0F2'}
                     >
-                        🗑 Remove
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                        </svg>
+                        Delete
                     </button>
                 </div>
             )}

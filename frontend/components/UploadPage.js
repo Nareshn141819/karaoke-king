@@ -162,6 +162,28 @@ function InstructionsPopup({ onClose }) {
   )
 }
 
+// ── Draft helpers ────────────────────────────────────────────────────
+const DRAFT_KEY = 'kk_upload_drafts'
+const DRAFT_TTL = 30 * 24 * 60 * 60 * 1000 // 30 days in ms
+
+function loadDrafts() {
+  try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || '[]') } catch { return [] }
+}
+function saveDraftsToStorage(drafts) {
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts))
+}
+function purgeExpiredDrafts() {
+  const now = Date.now()
+  const all = loadDrafts()
+  const alive = all.filter(d => now < d.expiresAt)
+  const purged = all.length - alive.length
+  if (purged > 0) saveDraftsToStorage(alive)
+  return { alive, purged }
+}
+function getDaysLeft(expiresAt) {
+  return Math.max(0, Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000)))
+}
+
 // ── Main UploadPage ────────────────────────────────────────────────
 export default function UploadPage() {
   const [user, setUser] = useState(null)
@@ -175,6 +197,12 @@ export default function UploadPage() {
   const [done, setDone] = useState(false)
   const [err, setErr] = useState('')
   const [showHelp, setShowHelp] = useState(false)
+
+  // Drafts state
+  const [drafts, setDrafts] = useState([])
+  const [showDrafts, setShowDrafts] = useState(false)
+  const [toast, setToast] = useState(null) // { msg, type }
+  const [purgedCount, setPurgedCount] = useState(0)
 
   // Lyrics state
   const [lines, setLines] = useState([{ text: '', time: 0 }])
@@ -200,7 +228,19 @@ export default function UploadPage() {
     const u = getUser()
     if (!u) { window.location.href = '/login'; return }
     setUser(u)
+    // Purge expired drafts on load
+    const { alive, purged } = purgeExpiredDrafts()
+    setDrafts(alive)
+    if (purged > 0) setPurgedCount(purged)
   }, [])
+
+  // Show toast for purged drafts after showToast is defined
+  useEffect(() => {
+    if (purgedCount > 0) {
+      showToast(`🗑️ ${purgedCount} draft${purgedCount > 1 ? 's' : ''} expired and were removed`, 'warn')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purgedCount])
 
   // Hydrate form from localStorage
   useEffect(() => {
@@ -220,7 +260,7 @@ export default function UploadPage() {
     }
   }, [])
 
-  // Save form to localStorage
+  // Save form to localStorage (autosave)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -230,6 +270,53 @@ export default function UploadPage() {
       } catch (e) { }
     }
   }, [title, artist, genre, lines, rawText, plainLyrics])
+
+  // ── Toast helper ─────────────────────────────────────────────
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  // ── Save current form as a draft ────────────────────────────
+  const saveDraft = () => {
+    if (!title.trim() && lines.every(l => !l.text.trim())) {
+      showToast('⚠️ Add a title or some lyrics before saving a draft', 'warn')
+      return
+    }
+    const now = Date.now()
+    const draft = {
+      id: now.toString(),
+      title: title || 'Untitled Draft',
+      artist, genre,
+      lines, rawText, plainLyrics,
+      savedAt: now,
+      expiresAt: now + DRAFT_TTL,
+    }
+    const existing = loadDrafts()
+    saveDraftsToStorage([draft, ...existing])
+    setDrafts([draft, ...existing])
+    showToast('✅ Draft saved! It will be kept for 30 days.', 'success')
+  }
+
+  // ── Load a draft into the form ──────────────────────────────
+  const loadDraft = (draft) => {
+    setTitle(draft.title || '')
+    setArtist(draft.artist || '')
+    setGenre(draft.genre || 'Pop')
+    setLines(draft.lines || [{ text: '', time: 0 }])
+    setRawText(draft.rawText || false)
+    setPlainLyrics(draft.plainLyrics || '')
+    setShowDrafts(false)
+    showToast(`📂 Draft "${draft.title}" loaded!`, 'success')
+  }
+
+  // ── Delete a single draft ───────────────────────────────────
+  const deleteDraft = (id) => {
+    const updated = loadDrafts().filter(d => d.id !== id)
+    saveDraftsToStorage(updated)
+    setDrafts(updated)
+    showToast('🗑️ Draft deleted', 'warn')
+  }
 
   // ── Sync active lyric line while audio plays ──────────────
   useEffect(() => {
@@ -389,8 +476,124 @@ export default function UploadPage() {
       <div style={{ maxWidth: 640, margin: '0 auto', padding: 'calc(var(--nav) + 20px) 16px calc(var(--bot) + 24px)' }}>
 
         <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 24, color: 'var(--text)' }}>Upload a Song</h1>
-          <p style={{ color: 'var(--text2)', fontSize: 14, marginTop: 4 }}>Share an instrumental track for the community to sing</p>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <h1 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 24, color: 'var(--text)' }}>Upload a Song</h1>
+              <p style={{ color: 'var(--text2)', fontSize: 14, marginTop: 4 }}>Share an instrumental track for the community to sing</p>
+            </div>
+            <button
+              onClick={() => setShowDrafts(v => !v)}
+              style={{
+                flexShrink: 0, padding: '8px 16px', borderRadius: 50, fontSize: 12, fontWeight: 800,
+                background: showDrafts ? 'var(--grad)' : 'white',
+                color: showDrafts ? 'white' : 'var(--purple)',
+                border: showDrafts ? 'none' : '1.5px solid var(--purple)',
+                cursor: 'pointer', transition: 'all 0.2s',
+                boxShadow: showDrafts ? '0 4px 16px rgba(155,92,246,0.35)' : 'none',
+                position: 'relative',
+              }}
+            >
+              📝 Drafts {drafts.length > 0 && (
+                <span style={{
+                  position: 'absolute', top: -6, right: -6,
+                  minWidth: 18, height: 18, borderRadius: '50%',
+                  background: 'var(--pink)', color: 'white',
+                  fontSize: 10, fontWeight: 900,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 4px',
+                }}>{drafts.length}</span>
+              )}
+            </button>
+          </div>
+
+          {/* ── Drafts Panel ── */}
+          {showDrafts && (
+            <div style={{
+              marginTop: 16, borderRadius: 18,
+              background: 'white', border: '1.5px solid var(--border)',
+              boxShadow: '0 8px 40px rgba(155,92,246,0.13)',
+              overflow: 'hidden', animation: 'slideUp 0.25s ease',
+            }}>
+              <div style={{
+                padding: '14px 18px', borderBottom: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 15, color: 'var(--text)' }}>
+                  📝 Saved Drafts
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600 }}>
+                  Auto-deleted after 30 days
+                </div>
+              </div>
+
+              {drafts.length === 0 ? (
+                <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 40, marginBottom: 10 }}>📭</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text2)', marginBottom: 6 }}>No drafts saved yet</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>
+                    Fill in the form below and tap <strong>💾 Save Draft</strong> to save your progress.<br />
+                    Drafts are kept for <strong>30 days</strong> then auto-deleted.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+                  {drafts.map((draft) => {
+                    const daysLeft = getDaysLeft(draft.expiresAt)
+                    const isExpiring = daysLeft <= 3
+                    return (
+                      <div key={draft.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '13px 18px',
+                        borderBottom: '1px solid var(--border)',
+                        background: 'white', transition: 'background 0.15s',
+                      }}>
+                        <div style={{
+                          width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+                          background: 'linear-gradient(135deg,rgba(255,78,138,0.15),rgba(155,92,246,0.15))',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 20,
+                        }}>📝</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {draft.title}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+                            {draft.artist || 'No artist'} · {draft.genre}
+                          </div>
+                          <div style={{
+                            fontSize: 10, fontWeight: 800, marginTop: 4,
+                            color: isExpiring ? '#E0284A' : '#5B21B6',
+                            background: isExpiring ? 'rgba(224,40,74,0.08)' : 'rgba(155,92,246,0.08)',
+                            border: `1px solid ${isExpiring ? 'rgba(224,40,74,0.25)' : 'rgba(155,92,246,0.25)'}`,
+                            borderRadius: 20, padding: '2px 8px', display: 'inline-block',
+                          }}>
+                            {isExpiring ? `⚠️ Expires in ${daysLeft}d` : `⏰ ${daysLeft} days left`}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <button
+                            onClick={() => loadDraft(draft)}
+                            style={{
+                              padding: '6px 14px', borderRadius: 50, fontSize: 11, fontWeight: 800,
+                              background: 'var(--grad)', color: 'white', border: 'none', cursor: 'pointer',
+                            }}
+                          >Load</button>
+                          <button
+                            onClick={() => deleteDraft(draft.id)}
+                            style={{
+                              width: 30, height: 30, borderRadius: '50%', border: 'none',
+                              background: 'rgba(224,40,74,0.08)', color: '#E0284A',
+                              cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                          >✕</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Cover art */}
@@ -599,10 +802,24 @@ export default function UploadPage() {
           </div>
         )}
 
-        <button onClick={submit} disabled={loading} className="btn btn-grad"
-          style={{ width: '100%', padding: '15px', fontSize: 16, borderRadius: 50, opacity: loading ? 0.7 : 1 }}>
-          {loading ? 'Uploading…' : '🎵 Upload Song'}
-        </button>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 4 }}>
+          <button onClick={saveDraft}
+            style={{
+              flex: 1, padding: '14px', fontSize: 14, borderRadius: 50,
+              background: 'white', border: '2px solid var(--purple)', color: 'var(--purple)',
+              fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito',sans-serif",
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(155,92,246,0.07)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'white' }}
+          >
+            💾 Save Draft
+          </button>
+          <button onClick={submit} disabled={loading} className="btn btn-grad"
+            style={{ flex: 2, padding: '15px', fontSize: 16, borderRadius: 50, opacity: loading ? 0.7 : 1 }}>
+            {loading ? 'Uploading…' : '🎵 Upload Song'}
+          </button>
+        </div>
       </div>
 
       <BottomNav />
@@ -626,6 +843,26 @@ export default function UploadPage() {
         onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(155,92,246,0.6)' }}
         onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(155,92,246,0.45)' }}
       >?</button>
+
+      {/* ── Toast notification ── */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 99999, pointerEvents: 'none',
+          animation: 'slideUp 0.3s ease',
+        }}>
+          <div style={{
+            padding: '12px 22px', borderRadius: 50,
+            background: toast.type === 'warn' ? 'rgba(255,140,0,0.95)' : 'rgba(34,197,94,0.95)',
+            color: 'white', fontSize: 13, fontWeight: 800,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+            backdropFilter: 'blur(10px)',
+            whiteSpace: 'nowrap',
+          }}>
+            {toast.msg}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

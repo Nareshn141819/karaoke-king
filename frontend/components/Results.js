@@ -233,7 +233,7 @@ export default function Results({ score, song, onAgain, onNew }) {
             )}
             {drafted && (
               <p style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: 'var(--text3)' }}>
-                Saved to <a href="/profile" style={{ color: '#4F46E5', fontWeight: 700, textDecoration: 'none' }}>Your Drafts</a>
+                Saved to <a href="/profile" style={{ color: '#4F46E5', fontWeight: 700, textDecoration: 'none' }}>Your Drafts</a> · <span style={{ color: '#E0284A', fontWeight: 700 }}>⏰ Auto-deleted after 30 days</span>
               </p>
             )}
             {actionErr && <p style={{ textAlign: 'center', marginTop: 6, fontSize: 12, color: '#E0284A' }}>⚠️ {actionErr}</p>}

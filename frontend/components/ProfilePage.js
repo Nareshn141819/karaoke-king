@@ -5,6 +5,31 @@ import BottomNav from './BottomNav'
 import PerformanceCard from './PerformanceCard'
 import { getUser, setUser as saveUser, getCommunityFeed, delCommunityFeed, addCommunityFeed, getDrafts, delDraft, logout, fbUpdateName, fbUpdatePassword, getProfile, upsertProfile, uploadAvatar } from '../lib/store'
 
+// ── Draft expiry helpers ──────────────────────────────────────────────
+const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000  // 30 days
+
+/** Resolve a Firestore Timestamp OR plain ms number → milliseconds */
+function toMs(val) {
+  if (!val) return null
+  if (typeof val === 'number') return val                    // plain ms
+  if (val.toMillis) return val.toMillis()                   // Firestore Timestamp
+  if (val.seconds) return val.seconds * 1000                // Firestore Timestamp (plain object)
+  return null
+}
+
+function getDraftDaysLeft(draft) {
+  // Prefer the expiresAt field (set by Firestore TTL), fall back to id-based calc
+  const expiresAtMs = toMs(draft.expiresAt)
+    ?? (toMs(draft.savedAt) ?? (draft.id || Date.now())) + DRAFT_TTL_MS
+  return Math.max(0, Math.ceil((expiresAtMs - Date.now()) / (24 * 60 * 60 * 1000)))
+}
+
+function isDraftExpired(draft) {
+  const expiresAtMs = toMs(draft.expiresAt)
+    ?? (toMs(draft.savedAt) ?? (draft.id || Date.now())) + DRAFT_TTL_MS
+  return Date.now() > expiresAtMs
+}
+
 // Generic person SVG avatar
 const PersonAvatar = ({ size = 80, style = {} }) => (
   <svg width={size} height={size} viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: '50%', ...style }}>
@@ -88,7 +113,14 @@ export default function ProfilePage() {
     getCommunityFeed().then(all => {
       setPerfs(all.filter(p => p.uid === u.uid))
     })
-    getDrafts(u.uid).then(d => setDrafts(d))
+    getDrafts(u.uid).then(all => {
+      // Auto-purge expired drafts
+      const alive = all.filter(d => !isDraftExpired(d))
+      const expired = all.filter(d => isDraftExpired(d))
+      // Delete expired drafts from Firestore silently
+      expired.forEach(d => delDraft(d.id, d.docId).catch(() => {}))
+      setDrafts(alive)
+    })
     fetch(`${API}/api/songs?uid=${u.uid}`)
       .then(r => r.ok ? r.json() : { songs: [] })
       .then(d => setSongs(d.songs || []))
@@ -205,7 +237,7 @@ export default function ProfilePage() {
         {/* Skeleton tabs */}
         <div className="skeleton" style={{ borderRadius: 12, height: 44, marginBottom: 20 }} />
         {/* Skeleton list items */}
-        {[0,1,2].map(i => (
+        {[0, 1, 2].map(i => (
           <div key={i} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
             <div className="skeleton" style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0 }} />
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -224,10 +256,10 @@ export default function ProfilePage() {
 
   // Stats row — Drafts removed
   const statItems = [
-    { label: 'Songs',     value: songs.length },
+    { label: 'Songs', value: songs.length },
     { label: 'Followers', value: followersCount },
     { label: 'Following', value: followingCount },
-    { label: 'Perfs',     value: perfs.length },
+    { label: 'Perfs', value: perfs.length },
   ]
 
   return (
@@ -271,7 +303,7 @@ export default function ProfilePage() {
 
         {/* Profile hero */}
         <div style={{ borderRadius: 24, background: 'var(--grad)', padding: '32px 24px 28px', textAlign: 'center', marginBottom: 20, position: 'relative', overflow: 'visible' }}>
-          <div style={{ position: 'absolute', top: -20, right: -20, fontSize: 100, opacity: 0.08, pointerEvents: 'none', overflow:'hidden', borderRadius:24 }}>👤</div>
+          <div style={{ position: 'absolute', top: -20, right: -20, fontSize: 100, opacity: 0.08, pointerEvents: 'none', overflow: 'hidden', borderRadius: 24 }}>👤</div>
 
           <button
             onClick={() => setShowSettings(!showSettings)}
@@ -345,7 +377,8 @@ export default function ProfilePage() {
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'none'}
                     >
-                      📷 Change Image
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      Change Image
                     </button>
                     {avatarUrl && (
                       <button
@@ -354,7 +387,7 @@ export default function ProfilePage() {
                         onMouseEnter={e => e.currentTarget.style.background = '#FFF0F2'}
                         onMouseLeave={e => e.currentTarget.style.background = 'none'}
                       >
-                        🗑 Remove Image
+                        <TrashIcon /> Remove Image
                       </button>
                     )}
                   </div>
@@ -444,7 +477,7 @@ export default function ProfilePage() {
             {loading || profileLoading ? (
               /* Full skeleton for all tabs */
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[0,1,2,3].map(i => (
+                {[0, 1, 2, 3].map(i => (
                   <div key={i} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
                     <div className="skeleton" style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0 }} />
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -526,29 +559,43 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {drafts.map(d => (
-                    <div key={d.id}>
-                      <PerformanceCard item={d} currentUser={user} onDelete={null} compact={false} />
-                      {/* Draft action bar */}
-                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                        <button
-                          onClick={() => postDraft(d)}
-                          disabled={postingDraft === d.id}
-                          className="btn btn-grad"
-                          style={{ flex: 1, padding: '10px', fontSize: 13, opacity: postingDraft === d.id ? 0.7 : 1 }}
-                        >
-                          {postingDraft === d.id ? '⏳ Posting…' : '📤 Post to Community'}
-                        </button>
-                        <button
-                          onClick={() => removeDraft(d.id, d.docId)}
-                          className="btn btn-red"
-                          style={{ padding: '10px 14px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}
-                        >
-                          <TrashIcon /> Delete
-                        </button>
+                  {drafts.map(d => {
+                    const daysLeft = getDraftDaysLeft(d)
+                    const isExpiring = daysLeft <= 3
+                    return (
+                      <div key={d.id}>
+                        <PerformanceCard item={d} currentUser={user} onDelete={null} compact={false} />
+
+                        {/* Draft action bar */}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                          <button
+                            onClick={() => postDraft(d)}
+                            disabled={postingDraft === d.id}
+                            className="btn btn-grad"
+                            style={{ flex: 1, padding: '10px', fontSize: 13, opacity: postingDraft === d.id ? 0.7 : 1 }}
+                          >
+                            {postingDraft === d.id ? '⏳ Posting…' : '📤 Post to Community'}
+                          </button>
+                          <button
+                            onClick={() => removeDraft(d.id, d.docId)}
+                            className="btn btn-red"
+                            style={{ padding: '10px 14px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}
+                          >
+                            <TrashIcon /> Delete
+                          </button>
+                        </div>
+
+                        {/* Expiry text */}
+                        <p style={{ fontSize: 11, color: isExpiring ? '#E0284A' : 'var(--text3)', fontWeight: 600, marginTop: 6, textAlign: 'center' }}>
+                          {isExpiring && daysLeft === 0
+                            ? '⚠️ This draft expires today!'
+                            : isExpiring
+                            ? `⚠️ Expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
+                            : `⏰ It will expire in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`}
+                        </p>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )
             )}

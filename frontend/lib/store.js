@@ -1,7 +1,7 @@
 // Safe localStorage helpers — all SSR-guarded
 const isBrowser = () => typeof window !== 'undefined'
 import { db, auth, googleProvider, storage } from './firebase'
-import { collection, addDoc, getDocs, deleteDoc, doc, getDoc, setDoc, updateDoc, query, orderBy, limit, where } from 'firebase/firestore'
+import { collection, addDoc, getDocs, deleteDoc, doc, getDoc, setDoc, updateDoc, query, orderBy, limit, where, Timestamp } from 'firebase/firestore'
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, updatePassword as fbUpdatePasswordInternal } from 'firebase/auth'
 
@@ -20,7 +20,7 @@ export const store = {
 // Session
 export const getUser = () => store.get('kk_user')
 export const setUser = (u) => store.set('kk_user', u)
-export const logout  = () => { store.del('kk_user'); store.del('kk_profile') }
+export const logout = () => { store.del('kk_user'); store.del('kk_profile') }
 
 // ── Firebase user profile (Firestore: users/{uid}) ──────────────
 /**
@@ -250,11 +250,15 @@ export const getDrafts = async (uid) => {
   }
 }
 export const addDraft = async (item) => {
+  const now = Date.now()
+  const savedAt = Timestamp.fromMillis(now)
+  const expiresAt = Timestamp.fromMillis(now + 30 * 24 * 60 * 60 * 1000) // 30 days TTL
   try {
-    await addDoc(collection(db, "drafts"), { ...item, isDraft: true });
+    await addDoc(collection(db, "drafts"), { ...item, isDraft: true, savedAt, expiresAt });
   } catch (e) {
+    // fallback to localStorage
     const d = store.get('kk_drafts') || []
-    d.unshift({ ...item, isDraft: true })
+    d.unshift({ ...item, isDraft: true, savedAt: now, expiresAt: now + 30 * 24 * 60 * 60 * 1000 })
     store.set('kk_drafts', d.slice(0, 20))
   }
 }

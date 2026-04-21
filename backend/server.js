@@ -69,6 +69,125 @@ app.get('/api/search', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'YouTube search failed' }) }
 })
 
+// ════════════════════════════════════════════════════════════════
+// ── Listen Section APIs ────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+
+// ── Listen: Search (music, not karaoke) ───────────────────────
+app.get('/api/listen/search', async (req, res) => {
+  const q = req.query.q
+  if (!q) return res.status(400).json({ error: 'Missing query' })
+
+  const key = process.env.YOUTUBE_API_KEY
+  if (!key) {
+    // Demo results for listen mode
+    return res.json({
+      items: [
+        { videoId: 'dQw4w9WgXcQ', title: `${q} - Full Song`, artist: 'Various Artists', channelTitle: 'Music Channel', thumbnail: `https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg` },
+        { videoId: '9bZkp7q19f0', title: `${q} - Official Audio`, artist: 'Various Artists', channelTitle: 'Music World', thumbnail: `https://img.youtube.com/vi/9bZkp7q19f0/hqdefault.jpg` },
+        { videoId: 'L_jWHffIx5E', title: `${q} - Lyrics Video`, artist: 'Various Artists', channelTitle: 'Lyrics HD', thumbnail: `https://img.youtube.com/vi/L_jWHffIx5E/hqdefault.jpg` },
+      ]
+    })
+  }
+
+  try {
+    const fetch = require('node-fetch')
+    // Search for official songs, not karaoke
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&q=${encodeURIComponent(q + ' official audio')}&maxResults=20&key=${key}`
+    const r = await fetch(url)
+    const data = await r.json()
+
+    if (data.error) {
+      console.log('YouTube API error for listen search, using fallback')
+      return res.json({
+        items: [
+          { videoId: 'dQw4w9WgXcQ', title: `${q} - Full Song`, artist: 'Various Artists', channelTitle: 'Music Channel', thumbnail: `https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg` },
+          { videoId: '9bZkp7q19f0', title: `${q} - Official Audio`, artist: 'Various Artists', channelTitle: 'Music World', thumbnail: `https://img.youtube.com/vi/9bZkp7q19f0/hqdefault.jpg` },
+        ]
+      })
+    }
+
+    // Flatten YT API response into simpler format for listen page
+    const items = (data.items || []).map(item => ({
+      videoId: item.id?.videoId || '',
+      title: item.snippet?.title || q,
+      artist: item.snippet?.channelTitle || 'Unknown',
+      channelTitle: item.snippet?.channelTitle || '',
+      thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || '',
+    }))
+
+    res.json({ items })
+  } catch (e) {
+    console.error('Listen search error:', e)
+    res.status(500).json({ error: 'Search failed' })
+  }
+})
+
+// ── Listen: Stream audio via yt-dlp (with URL cache for seeking) ──
+const YT_DLP = path.join(__dirname, 'yt-dlp.exe')
+const audioUrlCache = new Map() // videoId → { url, exp }
+
+async function getAudioUrl(videoId) {
+  const now = Date.now()
+  const cached = audioUrlCache.get(videoId)
+  if (cached && now < cached.exp) return cached.url
+
+  const ytUrl = `https://www.youtube.com/watch?v=${videoId}`
+  const url = await new Promise((resolve, reject) => {
+    const proc = spawn(YT_DLP, [
+      ytUrl,
+      '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio',
+      '--get-url', '--no-playlist', '--quiet',
+    ])
+    let out = '', err = ''
+    proc.stdout.on('data', d => out += d)
+    proc.stderr.on('data', d => err += d)
+    proc.on('close', code => {
+      const u = out.trim()
+      if (code === 0 && u) resolve(u)
+      else reject(new Error(err.trim() || 'yt-dlp failed'))
+    })
+    proc.on('error', reject)
+  })
+  audioUrlCache.set(videoId, { url, exp: now + 50 * 60 * 1000 }) // 50 min TTL
+  return url
+}
+
+app.get('/api/listen/audio/:videoId', async (req, res) => {
+  const { videoId } = req.params
+  if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    return res.status(400).json({ error: 'Invalid video ID' })
+  }
+  try {
+    const fetch = require('node-fetch')
+    const directUrl = await getAudioUrl(videoId)
+    const rangeHeader = req.headers.range
+
+    const upstream = await fetch(directUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        ...(rangeHeader ? { Range: rangeHeader } : {}),
+      },
+    })
+
+    const ct = upstream.headers.get('content-type') || 'audio/mp4'
+    const cl = upstream.headers.get('content-length')
+    const cr = upstream.headers.get('content-range')
+
+    res.setHeader('Content-Type', ct)
+    res.setHeader('Accept-Ranges', 'bytes')
+    res.setHeader('Cache-Control', 'no-store')
+    if (cl) res.setHeader('Content-Length', cl)
+    if (cr) res.setHeader('Content-Range', cr)
+    res.status(upstream.status)
+    upstream.body.pipe(res)
+    req.on('close', () => { try { upstream.body.destroy() } catch {} })
+  } catch (e) {
+    console.error('[audio]', e.message)
+    if (!res.headersSent) res.status(500).json({ error: e.message })
+  }
+})
+
 // ── Analyze voice ─────────────────────────────────────────────
 app.post('/analyze', voiceMul.single('voice'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No audio uploaded' })
@@ -157,5 +276,6 @@ const PORT = process.env.PORT || 5000
 app.listen(PORT, () => {
   console.log(`\n🎤  Karaoke King backend → http://localhost:${PORT}`)
   console.log(`    YouTube search: ${process.env.YOUTUBE_API_KEY ? '✅ API key set' : '⚠️  No YOUTUBE_API_KEY — demo results only'}`)
+  console.log(`    Listen audio:   ✅ Audio streaming enabled`)
   console.log(`    Python AI:      ${require('child_process').spawnSync(process.platform === 'win32' ? 'python' : 'python3', ['--version']).status === 0 ? '✅ Available' : '⚠️  Not found — using demo scores'}\n`)
 })

@@ -1,1 +1,8 @@
 .vercel
+node_modules
+.next
+.env.local
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map

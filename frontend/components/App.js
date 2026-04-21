@@ -131,7 +131,7 @@ export default function App() {
           <div className="skeleton" style={{ width: 120, height: 14, borderRadius: 6, marginBottom: 14 }} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {Array(8).fill(0).map((_, i) => (
-              <div key={i} className="skeleton" style={{ width: [80,100,70,90,110,75,95,85][i], height: 32, borderRadius: 50 }} />
+              <div key={i} className="skeleton" style={{ width: [80, 100, 70, 90, 110, 75, 95, 85][i], height: 32, borderRadius: 50 }} />
             ))}
           </div>
         </div>
@@ -174,18 +174,18 @@ export default function App() {
               <a href="/feed?tab=songs" style={{ fontSize: 13, fontWeight: 800, color: 'var(--pink)', textDecoration: 'none' }}>See all →</a>
             </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(148px,1fr))', gap: 14 }}>
-                {songs.slice(0, 8).map(s => (
-                  <SongCard key={s.id} song={s} onSing={() => goSing({
-                    title: s.title,
-                    videoId: s.videoId || '',
-                    thumbnail: s.coverUrl ? `${API}${s.coverUrl}` : '',
-                    instrumentalUrl: s.audioFile ? `${API}/uploads/${s.audioFile}` : '',
-                    lyrics: s.lyrics || '',
-                    timedLyrics: s.timedLyrics || null,
-                  })} />
-                ))}
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(148px,1fr))', gap: 14 }}>
+              {songs.slice(0, 8).map(s => (
+                <SongCard key={s.id} song={s} onSing={() => goSing({
+                  title: s.title,
+                  videoId: s.videoId || '',
+                  thumbnail: s.coverUrl ? `${API}${s.coverUrl}` : '',
+                  instrumentalUrl: s.audioFile ? `${API}/uploads/${s.audioFile}` : '',
+                  lyrics: s.lyrics || '',
+                  timedLyrics: s.timedLyrics || null,
+                })} />
+              ))}
+            </div>
           </section>
         )}
 
