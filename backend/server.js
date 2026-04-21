@@ -124,7 +124,18 @@ app.get('/api/listen/search', async (req, res) => {
 })
 
 // ── Listen: Stream audio via yt-dlp (with URL cache for seeking) ──
-const YT_DLP = path.join(__dirname, 'yt-dlp.exe')
+const YT_DLP = process.platform === 'win32' ? path.join(__dirname, 'yt-dlp.exe') : path.join(__dirname, 'yt-dlp');
+
+// Auto-download yt-dlp binary on Render/Linux if missing
+if (!fs.existsSync(YT_DLP)) {
+  console.log(`[Setup] Missing yt-dlp binary. Downloading for ${process.platform}...`);
+  const YTDlpWrap = require('yt-dlp-wrap').default;
+  YTDlpWrap.downloadFromGithub(YT_DLP).then(() => {
+    if (process.platform !== 'win32') fs.chmodSync(YT_DLP, '755');
+    console.log('[Setup] ✅ yt-dlp downloaded automatically.');
+  }).catch(e => console.log('[Setup] ❌ yt-dlp download failed:', e.message));
+}
+
 const audioUrlCache = new Map() // videoId → { url, exp }
 
 async function getAudioUrl(videoId) {
