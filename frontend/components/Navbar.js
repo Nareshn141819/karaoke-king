@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { getUser, getProfile } from '../lib/store'
 
 // Inline person SVG avatar (gradient background, no letters)
@@ -65,15 +66,15 @@ export default function Navbar() {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px',
       boxShadow: '0 1px 16px rgba(155,92,246,0.07)'
     }}>
-      <a href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--grad)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎤</div>
         <span className="grad-text" style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: -0.5 }}>Karaoke King</span>
-      </a>
+      </Link>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {user ? (
           <>
-            <a href="/upload" className="btn btn-grad" style={{ padding: '7px 16px', fontSize: 13 }}>+ Upload</a>
-            <a href="/profile" style={{ display: 'block', flexShrink: 0 }}>
+            <Link href="/upload" className="btn btn-grad" style={{ padding: '7px 16px', fontSize: 13 }}>+ Upload</Link>
+            <Link href="/profile" style={{ display: 'block', flexShrink: 0 }}>
               {photoUrl && !photoErr
                 ? <img
                     src={photoUrl}
@@ -83,10 +84,10 @@ export default function Navbar() {
                   />
                 : <NavPersonAvatar size={34} />
               }
-            </a>
+            </Link>
           </>
         ) : (
-          <a href="/login" className="btn btn-grad" style={{ padding: '8px 20px', fontSize: 13 }}>Sign In</a>
+          <Link href="/login" className="btn btn-grad" style={{ padding: '8px 20px', fontSize: 13 }}>Sign In</Link>
         )}
       </div>
     </header>

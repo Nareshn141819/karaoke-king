@@ -1,5 +1,6 @@
 "use client"
 import { useState } from 'react'
+import Link from 'next/link'
 import { fbSignIn, fbSignUp, setUser, fbGoogleSignIn } from '../lib/store'
 
 export default function LoginPage() {
@@ -91,7 +92,7 @@ export default function LoginPage() {
         </button>
 
         <div style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'var(--text2)' }}>
-          <a href="/" style={{ color: 'var(--text3)', textDecoration: 'none' }}>Continue as guest →</a>
+          <Link href="/" style={{ color: 'var(--text3)', textDecoration: 'none' }}>Continue as guest →</Link>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Link from 'next/link'
 import Navbar from './Navbar'
 import BottomNav from './BottomNav'
 import { getUser } from '../lib/store'
@@ -461,8 +462,8 @@ export default function UploadPage() {
         <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 26, marginBottom: 8 }}>Song Uploaded!</h2>
         <p style={{ color: 'var(--text2)', marginBottom: 28, fontSize: 15 }}>Your song is now live for everyone to sing</p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <a href="/" className="btn btn-grad" style={{ padding: '12px 28px', fontSize: 14, textDecoration: 'none' }}>🏠 Home</a>
-          <a href="/profile" className="btn btn-out" style={{ padding: '11px 28px', fontSize: 14, textDecoration: 'none' }}>👤 Profile</a>
+          <Link href="/" className="btn btn-grad" style={{ padding: '12px 28px', fontSize: 14, textDecoration: 'none' }}>🏠 Home</Link>
+          <Link href="/profile" className="btn btn-out" style={{ padding: '11px 28px', fontSize: 14, textDecoration: 'none' }}>👤 Profile</Link>
         </div>
       </div>
     </div>

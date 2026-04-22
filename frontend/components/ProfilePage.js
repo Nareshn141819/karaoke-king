@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import Navbar from './Navbar'
 import BottomNav from './BottomNav'
 import PerformanceCard from './PerformanceCard'
@@ -430,7 +431,7 @@ export default function ProfilePage() {
               </div>
 
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <a href="/upload" className="btn" style={{ padding: '9px 22px', fontSize: 13, borderRadius: 50, background: 'white', color: 'var(--pink)', textDecoration: 'none', fontWeight: 800 }}>+ Upload Song</a>
+                <Link href="/upload" className="btn" style={{ padding: '9px 22px', fontSize: 13, borderRadius: 50, background: 'white', color: 'var(--pink)', textDecoration: 'none', fontWeight: 800 }}>+ Upload Song</Link>
                 <button onClick={signOut} className="btn" style={{ padding: '8px 20px', fontSize: 13, borderRadius: 50, background: 'rgba(255,255,255,0.18)', color: 'white', border: '1.5px solid rgba(255,255,255,0.4)' }}>Sign Out</button>
               </div>
             </>
@@ -497,7 +498,7 @@ export default function ProfilePage() {
                 <div className="card" style={{ padding: 48, textAlign: 'center' }}>
                   <div style={{ fontSize: 48, marginBottom: 12 }}>🎵</div>
                   <p style={{ color: 'var(--text2)', marginBottom: 20 }}>You haven't uploaded any songs yet</p>
-                  <a href="/upload" className="btn btn-grad" style={{ padding: '11px 28px', fontSize: 14, textDecoration: 'none' }}>Upload First Song</a>
+                  <Link href="/upload" className="btn btn-grad" style={{ padding: '11px 28px', fontSize: 14, textDecoration: 'none' }}>Upload First Song</Link>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -539,7 +540,7 @@ export default function ProfilePage() {
                 <div className="card" style={{ padding: 48, textAlign: 'center' }}>
                   <div style={{ fontSize: 48, marginBottom: 12 }}>🎤</div>
                   <p style={{ color: 'var(--text2)', marginBottom: 20 }}>No recordings posted yet</p>
-                  <a href="/" className="btn btn-grad" style={{ padding: '11px 28px', fontSize: 14, textDecoration: 'none' }}>Start Singing</a>
+                  <Link href="/" className="btn btn-grad" style={{ padding: '11px 28px', fontSize: 14, textDecoration: 'none' }}>Start Singing</Link>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -555,7 +556,7 @@ export default function ProfilePage() {
                   <div style={{ fontSize: 48, marginBottom: 12 }}>💾</div>
                   <p style={{ color: 'var(--text2)', marginBottom: 8, fontWeight: 700 }}>No drafts saved</p>
                   <p style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 20 }}>After recording, hit "Save as Draft" to keep a private copy before posting.</p>
-                  <a href="/" className="btn btn-grad" style={{ padding: '11px 28px', fontSize: 14, textDecoration: 'none' }}>Start Singing</a>
+                  <Link href="/" className="btn btn-grad" style={{ padding: '11px 28px', fontSize: 14, textDecoration: 'none' }}>Start Singing</Link>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

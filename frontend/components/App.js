@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import Navbar, { NavbarSkeleton } from './Navbar'
 import BottomNav from './BottomNav'
 import SearchBar from './SearchBar'
@@ -171,7 +172,7 @@ export default function App() {
               <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 18, color: 'var(--text)' }}>
                 🎵 Community Songs
               </h2>
-              <a href="/feed?tab=songs" style={{ fontSize: 13, fontWeight: 800, color: 'var(--pink)', textDecoration: 'none' }}>See all →</a>
+              <Link href="/feed?tab=songs" style={{ fontSize: 13, fontWeight: 800, color: 'var(--pink)', textDecoration: 'none' }}>See all →</Link>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(148px,1fr))', gap: 14 }}>

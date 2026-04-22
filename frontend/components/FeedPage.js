@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import Navbar from './Navbar'
 import BottomNav from './BottomNav'
 import PerformanceCard from './PerformanceCard'
@@ -125,9 +126,9 @@ export default function FeedPage() {
               <p style={{ color: 'var(--text3)', fontSize: 13, marginBottom: 20 }}>
                 Be the first to share your performance with the community.
               </p>
-              <a href={user ? '/' : '/login'} className="btn btn-grad" style={{ padding: '11px 24px', fontSize: 14, textDecoration: 'none' }}>
+              <Link href={user ? '/' : '/login'} className="btn btn-grad" style={{ padding: '11px 24px', fontSize: 14, textDecoration: 'none' }}>
                 {user ? '🎤 Start Singing' : '🔐 Sign In to Sing'}
-              </a>
+              </Link>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -182,7 +183,7 @@ export default function FeedPage() {
             <div className="card" style={{ padding: 48, textAlign: 'center' }}>
               <div style={{ fontSize: 52, marginBottom: 14 }}>🎵</div>
               <p style={{ color: 'var(--text2)', marginBottom: 16 }}>No songs uploaded yet</p>
-              {user && <a href="/upload" className="btn btn-grad" style={{ padding: '11px 24px', fontSize: 14, textDecoration: 'none' }}>+ Upload Song</a>}
+              {user && <Link href="/upload" className="btn btn-grad" style={{ padding: '11px 24px', fontSize: 14, textDecoration: 'none' }}>+ Upload Song</Link>}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

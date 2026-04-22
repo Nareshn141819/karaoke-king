@@ -82,7 +82,7 @@ export default function ListenPage() {
     setUser(getUser())
     setFavorites(getFavorites())
     setQueue(TRENDING_SONGS.map((s, i) => ({ ...s, queueId: `t-${i}` })))
-    setTimeout(() => setPageLoading(false), 500)
+    setPageLoading(false)
   }, [])
 
   // ── Search ──────────────────────────────────────────────
@@ -176,7 +176,7 @@ export default function ListenPage() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 'calc(var(--nav) + 20px) 16px calc(var(--bot) + 100px)' }}>
 
         {/* ── Search Bar ── */}
-        <div style={{ position: 'relative', marginBottom: 20 }}>
+        <div style={{ marginBottom: 20 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
             background: 'white', borderRadius: 50, padding: '4px 6px 4px 20px',
@@ -200,38 +200,71 @@ export default function ListenPage() {
               {searching ? <div className="ls-spin" /> : <SearchIcon />}
             </button>
           </div>
-
-          {/* Search Results */}
-          {searchResults.length > 0 && searchQuery && (
-            <div style={{
-              position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0,
-              background: 'white', borderRadius: 18, overflow: 'hidden',
-              boxShadow: '0 16px 60px rgba(0,0,0,0.18)', border: '1px solid var(--border)',
-              zIndex: 100, maxHeight: '60vh', overflowY: 'auto',
-            }}>
-              {searchResults.map((item, i) => (
-                <button key={i}
-                  onClick={() => { playSong(item, searchResults); setSearchQuery(''); setSearchResults([]) }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    width: '100%', padding: '12px 16px', background: 'transparent',
-                    border: 'none', borderBottom: i < searchResults.length - 1 ? '1px solid #F0EBFF' : 'none',
-                    cursor: 'pointer', textAlign: 'left',
-                  }}>
-                  <img src={item.thumbnail || `https://img.youtube.com/vi/${item.videoId}/default.jpg`}
-                    alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{item.artist || item.channelTitle || ''}</div>
-                  </div>
-                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--grad)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', flexShrink: 0 }}>
-                    <PlayIcon size={14} />
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
+
+        {/* ── Search Results (persistent grid with bigger thumbnails) ── */}
+        {searchResults.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 900, fontSize: 17, color: 'var(--text)', margin: 0 }}>
+                🔍 Search Results
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', marginLeft: 8 }}>({searchResults.length})</span>
+              </h2>
+              <button onClick={() => { setSearchQuery(''); setSearchResults([]) }}
+                style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 50, padding: '6px 14px', fontSize: 11, fontWeight: 800, color: 'var(--text3)', cursor: 'pointer' }}>
+                Clear ✕
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(156px,1fr))', gap: 14 }}>
+              {searchResults.map((item, i) => {
+                const active = currentSong?.videoId === item.videoId
+                const playing = active && isPlaying
+                return (
+                  <div key={i}
+                    onClick={() => playSong(item, searchResults)}
+                    style={{
+                      borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
+                      background: active ? 'linear-gradient(135deg, rgba(255,78,138,0.08), rgba(155,92,246,0.08))' : 'white',
+                      border: active ? '1.5px solid rgba(255,78,138,0.35)' : '1px solid var(--border)',
+                      boxShadow: active ? '0 4px 20px rgba(255,78,138,0.15)' : '0 2px 12px rgba(0,0,0,0.05)',
+                      transition: 'all 0.25s', position: 'relative',
+                    }}>
+                    <div style={{ position: 'relative', aspectRatio: '16/10', overflow: 'hidden' }}>
+                      <img
+                        src={item.thumbnail || `https://img.youtube.com/vi/${item.videoId}/hqdefault.jpg`}
+                        alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <div style={{
+                        position: 'absolute', inset: 0,
+                        background: active ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.15)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        opacity: 0.9, transition: 'all 0.2s',
+                      }}>
+                        <div style={{
+                          width: 40, height: 40, borderRadius: '50%',
+                          background: active ? 'rgba(255,78,138,0.9)' : 'rgba(255,255,255,0.9)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                          color: active ? 'white' : '#1E0A3C',
+                        }}>
+                          {playing ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ padding: '10px 12px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: active ? '#FF4E8A' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {item.title}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {item.artist || item.channelTitle || ''}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ── Genre Pills ── */}
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 22, scrollbarWidth: 'none' }}>

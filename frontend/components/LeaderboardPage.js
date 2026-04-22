@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import Navbar from './Navbar'
 import BottomNav from './BottomNav'
 import { getCommunityFeed, getUser } from '../lib/store'
@@ -85,9 +86,9 @@ export default function LeaderboardPage() {
           <p style={{ color: 'var(--text2)', fontSize: 14, lineHeight: 1.8, marginBottom: 28 }}>
             Be the first to record a song and post it<br />to the community. Your score will appear here!
           </p>
-          <a href="/" className="btn btn-grad" style={{ padding: '13px 30px', fontSize: 14, textDecoration: 'none', borderRadius: 50 }}>
+          <Link href="/" className="btn btn-grad" style={{ padding: '13px 30px', fontSize: 14, textDecoration: 'none', borderRadius: 50 }}>
             🎵 Start Singing
-          </a>
+          </Link>
         </div>
       </div>
       <BottomNav />

@@ -141,55 +141,108 @@ const audioUrlCache = new Map() // videoId → { url, exp }
 const PIPED_INSTANCES = [
   'https://pipedapi.kavin.rocks',
   'https://pipedapi.syncpundit.io',
-  'https://pipedapi.tokhmi.xyz'
+  'https://pipedapi.tokhmi.xyz',
+  'https://pipedapi.adminforge.de',
+  'https://api.piped.projectsegfau.lt'
 ]
+
+// In-flight dedup: prevent multiple simultaneous yt-dlp spawns for same videoId
+const inFlightResolvers = new Map() // videoId → Promise<url>
 
 async function getAudioUrl(videoId) {
   const now = Date.now()
   const cached = audioUrlCache.get(videoId)
   if (cached && now < cached.exp) return cached.url
 
-  // 1. Try Piped Proxies (Ultra-fast & Bypasses BotGuard)
-  const fetch = require('node-fetch')
-  for (const api of PIPED_INSTANCES) {
-    try {
-      const r = await fetch(`${api}/streams/${videoId}`, { timeout: 4000 })
-      if (!r.ok) continue
-      const data = await r.json()
-      const stream = data.audioStreams?.find(s => s.mimeType.includes('mp4') || s.mimeType.includes('webm'))
-      if (stream && stream.url) {
-         audioUrlCache.set(videoId, { url: stream.url, exp: now + 50 * 60 * 1000 })
-         return stream.url
-      }
-    } catch (e) { /* skip to next instance */ }
+  // Deduplicate in-flight requests
+  if (inFlightResolvers.has(videoId)) {
+    return inFlightResolvers.get(videoId)
   }
 
-  // 2. Fallback to yt-dlp
-  const ytUrl = `https://www.youtube.com/watch?v=${videoId}`
-  const url = await new Promise((resolve, reject) => {
-    const proc = spawn(YT_DLP, [
-      ytUrl,
-      '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio',
-      '--get-url', '--no-playlist', '--quiet',
-      '--extractor-args', 'youtube:player_client=ios,android,tv',
-      '--js-runtimes', 'node:' + (process.execPath || 'node'),
-      ...(fs.existsSync(path.join(__dirname, 'cookies.txt')) ? ['--cookies', path.join(__dirname, 'cookies.txt')] : []),
-      '--force-ipv4',
-      '--no-warnings'
-    ])
-    let out = '', err = ''
-    proc.stdout.on('data', d => out += d)
-    proc.stderr.on('data', d => err += d)
-    proc.on('close', code => {
-      const u = out.trim()
-      if (code === 0 && u) resolve(u)
-      else reject(new Error(err.trim() || 'yt-dlp failed'))
+  const resolvePromise = (async () => {
+    const fetch = require('node-fetch')
+
+    // 1. Race ALL Piped instances in parallel (much faster than sequential)
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 3500)
+
+      const pipedPromises = PIPED_INSTANCES.map(async (api) => {
+        const r = await fetch(`${api}/streams/${videoId}`, {
+          signal: controller.signal,
+          timeout: 3000,
+        })
+        if (!r.ok) throw new Error(`${api} returned ${r.status}`)
+        const data = await r.json()
+        // Prefer m4a (better compatibility), then webm
+        const stream =
+          data.audioStreams?.find(s => s.mimeType?.includes('mp4')) ||
+          data.audioStreams?.find(s => s.mimeType?.includes('webm')) ||
+          data.audioStreams?.[0]
+        if (!stream?.url) throw new Error('No audio stream found')
+        return stream.url
+      })
+
+      const url = await Promise.any(pipedPromises)
+      clearTimeout(timeout)
+      audioUrlCache.set(videoId, { url, exp: now + 50 * 60 * 1000 })
+      return url
+    } catch (e) {
+      console.log(`[audio] Piped failed for ${videoId}, falling back to yt-dlp:`, e.message || 'All instances failed')
+    }
+
+    // 2. Fallback to yt-dlp
+    const ytUrl = `https://www.youtube.com/watch?v=${videoId}`
+    const url = await new Promise((resolve, reject) => {
+      const proc = spawn(YT_DLP, [
+        ytUrl,
+        '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio',
+        '--get-url', '--no-playlist', '--quiet',
+        '--extractor-args', 'youtube:player_client=ios,android,tv',
+        '--js-runtimes', 'node:' + (process.execPath || 'node'),
+        ...(fs.existsSync(path.join(__dirname, 'cookies.txt')) ? ['--cookies', path.join(__dirname, 'cookies.txt')] : []),
+        '--force-ipv4',
+        '--no-warnings'
+      ])
+      let out = '', err = ''
+      proc.stdout.on('data', d => out += d)
+      proc.stderr.on('data', d => err += d)
+      proc.on('close', code => {
+        const u = out.trim()
+        if (code === 0 && u) resolve(u)
+        else reject(new Error(err.trim() || 'yt-dlp failed'))
+      })
+      proc.on('error', reject)
+      // Kill yt-dlp if it takes too long
+      setTimeout(() => { try { proc.kill() } catch {} }, 15000)
     })
-    proc.on('error', reject)
-  })
-  audioUrlCache.set(videoId, { url, exp: now + 50 * 60 * 1000 }) // 50 min TTL
-  return url
+    audioUrlCache.set(videoId, { url, exp: now + 50 * 60 * 1000 }) // 50 min TTL
+    return url
+  })()
+
+  inFlightResolvers.set(videoId, resolvePromise)
+  try {
+    const result = await resolvePromise
+    return result
+  } finally {
+    inFlightResolvers.delete(videoId)
+  }
 }
+
+// HEAD requests — warm the cache without streaming data (used by frontend prefetch)
+app.head('/api/listen/audio/:videoId', async (req, res) => {
+  const { videoId } = req.params
+  if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    return res.status(400).end()
+  }
+  try {
+    await getAudioUrl(videoId) // just resolve & cache the URL
+    res.status(200).end()
+  } catch (e) {
+    console.error('[audio HEAD]', e.message)
+    res.status(500).end()
+  }
+})
 
 app.get('/api/listen/audio/:videoId', async (req, res) => {
   const { videoId } = req.params
@@ -214,7 +267,7 @@ app.get('/api/listen/audio/:videoId', async (req, res) => {
 
     res.setHeader('Content-Type', ct)
     res.setHeader('Accept-Ranges', 'bytes')
-    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('Cache-Control', 'public, max-age=300') // Cache for 5 min
     if (cl) res.setHeader('Content-Length', cl)
     if (cr) res.setHeader('Content-Range', cr)
     res.status(upstream.status)

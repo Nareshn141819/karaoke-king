@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { addCommunityFeed, addDraft, getUser } from '../lib/store'
 import PerformanceCard from './PerformanceCard'
 
@@ -228,12 +229,12 @@ export default function Results({ score, song, onAgain, onNew }) {
             {/* Status messages */}
             {posted && (
               <p style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: 'var(--text3)' }}>
-                Visible in <a href="/feed" style={{ color: 'var(--purple)', fontWeight: 700, textDecoration: 'none' }}>Community Feed</a>
+                Visible in <Link href="/feed" style={{ color: 'var(--purple)', fontWeight: 700, textDecoration: 'none' }}>Community Feed</Link>
               </p>
             )}
             {drafted && (
               <p style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: 'var(--text3)' }}>
-                Saved to <a href="/profile" style={{ color: '#4F46E5', fontWeight: 700, textDecoration: 'none' }}>Your Drafts</a> · <span style={{ color: '#E0284A', fontWeight: 700 }}>⏰ Auto-deleted after 30 days</span>
+                Saved to <Link href="/profile" style={{ color: '#4F46E5', fontWeight: 700, textDecoration: 'none' }}>Your Drafts</Link> · <span style={{ color: '#E0284A', fontWeight: 700 }}>⏰ Auto-deleted after 30 days</span>
               </p>
             )}
             {actionErr && <p style={{ textAlign: 'center', marginTop: 6, fontSize: 12, color: '#E0284A' }}>⚠️ {actionErr}</p>}
@@ -245,8 +246,8 @@ export default function Results({ score, song, onAgain, onNew }) {
           <button onClick={onAgain} className="btn btn-grad" style={{ padding: '14px', fontSize: 15 }}>🎤 Sing Again</button>
           <button onClick={onNew} className="btn btn-out" style={{ padding: '13px', fontSize: 15 }}>🎵 New Song</button>
           <div style={{ display: 'flex', gap: 8 }}>
-            <a href="/feed" className="btn btn-soft" style={{ flex: 1, padding: '11px', fontSize: 13, textDecoration: 'none', textAlign: 'center' }}>📻 Feed</a>
-            <a href="/leaderboard" className="btn btn-soft" style={{ flex: 1, padding: '11px', fontSize: 13, textDecoration: 'none', textAlign: 'center' }}>🏆 Ranks</a>
+            <Link href="/feed" className="btn btn-soft" style={{ flex: 1, padding: '11px', fontSize: 13, textDecoration: 'none', textAlign: 'center' }}>📻 Feed</Link>
+            <Link href="/leaderboard" className="btn btn-soft" style={{ flex: 1, padding: '11px', fontSize: 13, textDecoration: 'none', textAlign: 'center' }}>🏆 Ranks</Link>
           </div>
         </div>
       </div>

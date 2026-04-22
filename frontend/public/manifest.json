@@ -1,11 +1,13 @@
 {
   "name": "Karaoke King",
   "short_name": "Karaoke King",
-  "description": "Sing. Score. Shine.",
+  "description": "Sing. Score. Shine. — Your stage, your voice.",
+  "version": "2.1.0",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#6366f1",
+  "theme_color": "#9B5CF6",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -15,7 +17,8 @@
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

@@ -27,6 +27,8 @@ export function AudioProvider({ children }) {
   const [repeat, setRepeat] = useState(false)
 
   const audioRef = useRef(null)
+  // Cache of videoId -> audioUrl to skip server round-trip on replay
+  const urlCacheRef = useRef(new Map())
 
   // Restore last song from localStorage on mount
   useEffect(() => {
@@ -84,6 +86,19 @@ export function AudioProvider({ children }) {
     if (audioRef.current) audioRef.current.volume = muted ? 0 : volume
   }, [volume, muted])
 
+  // Prefetch: warm the backend cache for the next song in queue
+  const prefetchNext = useCallback((currentVideoId, songQueue) => {
+    if (!songQueue || songQueue.length < 2) return
+    const curIdx = songQueue.findIndex(s => s.videoId === currentVideoId)
+    if (curIdx === -1) return
+    const nextIdx = (curIdx + 1) % songQueue.length
+    const nextSong = songQueue[nextIdx]
+    if (nextSong?.videoId && !urlCacheRef.current.has(nextSong.videoId)) {
+      // Fire a HEAD request to warm the server-side cache, don't await
+      fetch(`${API}/api/listen/audio/${nextSong.videoId}`, { method: 'HEAD' }).catch(() => {})
+    }
+  }, [])
+
   const playSong = useCallback(async (song, songQueue = []) => {
     setAudioLoading(true)
     setAudioError(null)
@@ -106,29 +121,48 @@ export function AudioProvider({ children }) {
       }
 
       const audioUrl = `${API}/api/listen/audio/${videoId}`
+      urlCacheRef.current.set(videoId, audioUrl)
       const fullSong = { ...song, videoId, audioUrl }
       setCurrentSong(fullSong)
 
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current.src = audioUrl
+        // Use load() to immediately start buffering, then play
+        audioRef.current.load()
         audioRef.current.play()
           .then(() => { setIsPlaying(true); setAudioLoading(false) })
           .catch(e => { console.warn('Autoplay blocked:', e); setIsPlaying(false); setAudioLoading(false) })
       }
 
+      const effectiveQueue = songQueue.length > 0 ? songQueue : queue
       setQueue(prev => prev.some(s => s.videoId === videoId) ? prev : [...prev, { ...fullSong, queueId: `q-${Date.now()}` }])
-      setQueueIndex(prev => {
-        const q = queue.length > 0 ? queue : [fullSong]
+      setQueueIndex(() => {
+        const q = effectiveQueue.length > 0 ? effectiveQueue : [fullSong]
         return q.findIndex(s => s.videoId === videoId)
       })
+
+      // Prefetch next song in background after short delay
+      setTimeout(() => prefetchNext(videoId, songQueue.length > 0 ? songQueue : queue), 2000)
     } catch (e) { setAudioError('Failed to load audio'); setAudioLoading(false) }
-  }, [queue])
+  }, [queue, prefetchNext])
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current || !currentSong) return
     if (isPlaying) { audioRef.current.pause() }
-    else { audioRef.current.play().catch(() => {}) }
+    else {
+      // If no src is loaded (e.g. restored from localStorage), load it
+      if (!audioRef.current.src || audioRef.current.src === window.location.href) {
+        if (currentSong.audioUrl) {
+          audioRef.current.src = currentSong.audioUrl
+          audioRef.current.load()
+        } else if (currentSong.videoId) {
+          audioRef.current.src = `${API}/api/listen/audio/${currentSong.videoId}`
+          audioRef.current.load()
+        }
+      }
+      audioRef.current.play().catch(() => {})
+    }
   }, [isPlaying, currentSong])
 
   const playNext = useCallback(() => {
@@ -175,8 +209,8 @@ export function AudioProvider({ children }) {
       shuffle, setShuffle, repeat, setRepeat,
       audioRef, playSong, togglePlay, playNext, playPrev, seekTo, fmt, closePlayer,
     }}>
-      {/* Single global audio element */}
-      <audio ref={audioRef} preload="none" style={{ display: 'none' }} />
+      {/* Single global audio element — preload auto for faster start */}
+      <audio ref={audioRef} preload="auto" style={{ display: 'none' }} />
       {children}
     </Ctx.Provider>
   )
