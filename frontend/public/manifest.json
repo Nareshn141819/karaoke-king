@@ -2,7 +2,7 @@
   "name": "Karaoke King",
   "short_name": "Karaoke King",
   "description": "Sing. Score. Shine. — Your stage, your voice.",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

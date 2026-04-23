@@ -38,6 +38,29 @@ app.get('/api/search', async (req, res) => {
   const q = req.query.q
   if (!q) return res.status(400).json({ error: 'Missing query' })
 
+  // Search DB first
+  const songs = loadSongs()
+  const lowerQ = q.toLowerCase()
+  
+  const dbMatches = songs.filter(s => 
+    s.videoId && (
+      (s.title && s.title.toLowerCase().includes(lowerQ)) ||
+      (s.artist && s.artist.toLowerCase().includes(lowerQ))
+    )
+  )
+
+  if (dbMatches.length > 0) {
+    const items = dbMatches.map(s => ({
+      id: { videoId: s.videoId },
+      snippet: { 
+        title: `${s.title}${s.artist ? ' - ' + s.artist : ''}`, 
+        channelTitle: s.uploaderName || 'Karaoke DB', 
+        thumbnails: { default: { url: s.coverUrl || `https://img.youtube.com/vi/${s.videoId}/default.jpg` } } 
+      }
+    }))
+    return res.json({ items: items.slice(0, 50) })
+  }
+
   const key = process.env.YOUTUBE_API_KEY
   if (!key) {
     // Demo results — works without a key
@@ -78,6 +101,28 @@ app.get('/api/listen/search', async (req, res) => {
   const q = req.query.q
   if (!q) return res.status(400).json({ error: 'Missing query' })
 
+  // Search DB first
+  const songs = loadSongs()
+  const lowerQ = q.toLowerCase()
+  
+  const dbMatches = songs.filter(s => 
+    s.videoId && (
+      (s.title && s.title.toLowerCase().includes(lowerQ)) ||
+      (s.artist && s.artist.toLowerCase().includes(lowerQ))
+    )
+  )
+
+  if (dbMatches.length > 0) {
+    const items = dbMatches.map(s => ({
+      videoId: s.videoId,
+      title: s.title,
+      artist: s.artist || 'Unknown',
+      channelTitle: s.uploaderName || 'Karaoke DB',
+      thumbnail: s.coverUrl || `https://img.youtube.com/vi/${s.videoId}/hqdefault.jpg`
+    }))
+    return res.json({ items: items.slice(0, 50) })
+  }
+
   const key = process.env.YOUTUBE_API_KEY
   if (!key) {
     // Demo results for listen mode
@@ -93,7 +138,7 @@ app.get('/api/listen/search', async (req, res) => {
   try {
     const fetch = require('node-fetch')
     // Search for official songs, not karaoke
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&q=${encodeURIComponent(q + ' official audio')}&maxResults=20&key=${key}`
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&q=${encodeURIComponent(q + ' official audio')}&maxResults=50&key=${key}`
     const r = await fetch(url)
     const data = await r.json()
 
@@ -249,6 +294,17 @@ app.get('/api/listen/audio/:videoId', async (req, res) => {
   if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
     return res.status(400).json({ error: 'Invalid video ID' })
   }
+
+  // Check if we have this song's audio file locally in the DB
+  const songs = loadSongs()
+  const localSong = songs.find(s => s.videoId === videoId && s.audioFile)
+  if (localSong) {
+    const localPath = path.join(UPLOADS, localSong.audioFile)
+    if (fs.existsSync(localPath)) {
+      return res.sendFile(localPath)
+    }
+  }
+
   try {
     const fetch = require('node-fetch')
     const directUrl = await getAudioUrl(videoId)

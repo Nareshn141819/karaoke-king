@@ -119,7 +119,7 @@ export default function ProfilePage() {
       const alive = all.filter(d => !isDraftExpired(d))
       const expired = all.filter(d => isDraftExpired(d))
       // Delete expired drafts from Firestore silently
-      expired.forEach(d => delDraft(d.id, d.docId).catch(() => {}))
+      expired.forEach(d => delDraft(d.id, d.docId).catch(() => { }))
       setDrafts(alive)
     })
     fetch(`${API}/api/songs?uid=${u.uid}`)
@@ -378,7 +378,7 @@ export default function ProfilePage() {
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'none'}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
                       Change Image
                     </button>
                     {avatarUrl && (
@@ -464,6 +464,9 @@ export default function ProfilePage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 16 }}>
               <button onClick={() => setShowSettings(false)} className="btn" style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface)', color: 'var(--text2)', borderRadius: 50 }}>← Back to Profile</button>
               <button onClick={signOut} className="btn btn-red" style={{ padding: '8px 16px', fontSize: 13 }}>Sign Out</button>
+            </div>
+            <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: 'var(--text3)' }}>
+              Version: v2.0.2
             </div>
           </div>
         ) : (
@@ -591,8 +594,8 @@ export default function ProfilePage() {
                           {isExpiring && daysLeft === 0
                             ? '⚠️ This draft expires today!'
                             : isExpiring
-                            ? `⚠️ Expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
-                            : `⏰ It will expire in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`}
+                              ? `⚠️ Expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
+                              : `⏰ It will expire in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`}
                         </p>
                       </div>
                     )
