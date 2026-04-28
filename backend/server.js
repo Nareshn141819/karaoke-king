@@ -183,16 +183,42 @@ if (!fs.existsSync(YT_DLP)) {
 
 const audioUrlCache = new Map() // videoId → { url, exp }
 
-const PIPED_INSTANCES = [
-  'https://pipedapi.kavin.rocks',
-  'https://pipedapi.syncpundit.io',
-  'https://pipedapi.tokhmi.xyz',
-  'https://pipedapi.adminforge.de',
-  'https://api.piped.projectsegfau.lt'
-]
-
 // In-flight dedup: prevent multiple simultaneous yt-dlp spawns for same videoId
 const inFlightResolvers = new Map() // videoId → Promise<url>
+
+// Helper: run yt-dlp for a single videoId/search term and return audio URL
+function ytdlpGetUrl(query) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      query,
+      '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio',
+      '--get-url', '--no-playlist', '--quiet',
+      ...(fs.existsSync(path.join(__dirname, 'cookies.txt')) ? ['--cookies', path.join(__dirname, 'cookies.txt')] : []),
+      '--force-ipv4',
+      '--no-warnings',
+      '--no-check-certificates',
+    ]
+    console.log(`[yt-dlp] Extracting: ${query}`)
+    const proc = spawn(YT_DLP, args)
+    let out = '', err = ''
+    proc.stdout.on('data', d => out += d)
+    proc.stderr.on('data', d => err += d)
+    proc.on('close', code => {
+      const u = out.trim().split('\n')[0] // take first URL if multiple
+      if (code === 0 && u && u.startsWith('http')) {
+        console.log(`[yt-dlp] ✅ Got URL for ${query.substring(0, 50)}`)
+        resolve(u)
+      } else {
+        const errMsg = err.trim() || 'yt-dlp failed'
+        console.log(`[yt-dlp] ❌ Failed: ${errMsg.substring(0, 120)}`)
+        reject(new Error(errMsg))
+      }
+    })
+    proc.on('error', reject)
+    // Kill if it takes too long
+    setTimeout(() => { try { proc.kill() } catch {} }, 25000)
+  })
+}
 
 async function getAudioUrl(videoId) {
   const now = Date.now()
@@ -205,64 +231,27 @@ async function getAudioUrl(videoId) {
   }
 
   const resolvePromise = (async () => {
-    const fetch = require('node-fetch')
-
-    // 1. Race ALL Piped instances in parallel (much faster than sequential)
+    // 1. Try direct video URL with yt-dlp
     try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 3500)
-
-      const pipedPromises = PIPED_INSTANCES.map(async (api) => {
-        const r = await fetch(`${api}/streams/${videoId}`, {
-          signal: controller.signal,
-          timeout: 3000,
-        })
-        if (!r.ok) throw new Error(`${api} returned ${r.status}`)
-        const data = await r.json()
-        // Prefer m4a (better compatibility), then webm
-        const stream =
-          data.audioStreams?.find(s => s.mimeType?.includes('mp4')) ||
-          data.audioStreams?.find(s => s.mimeType?.includes('webm')) ||
-          data.audioStreams?.[0]
-        if (!stream?.url) throw new Error('No audio stream found')
-        return stream.url
-      })
-
-      const url = await Promise.any(pipedPromises)
-      clearTimeout(timeout)
+      const ytUrl = `https://www.youtube.com/watch?v=${videoId}`
+      const url = await ytdlpGetUrl(ytUrl)
       audioUrlCache.set(videoId, { url, exp: now + 50 * 60 * 1000 })
       return url
     } catch (e) {
-      console.log(`[audio] Piped failed for ${videoId}, falling back to yt-dlp:`, e.message || 'All instances failed')
+      console.log(`[audio] Direct yt-dlp failed for ${videoId}: ${e.message?.substring(0, 100)}`)
     }
 
-    // 2. Fallback to yt-dlp
-    const ytUrl = `https://www.youtube.com/watch?v=${videoId}`
-    const url = await new Promise((resolve, reject) => {
-      const proc = spawn(YT_DLP, [
-        ytUrl,
-        '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio',
-        '--get-url', '--no-playlist', '--quiet',
-        '--extractor-args', 'youtube:player_client=ios,android,tv',
-        '--js-runtimes', 'node:' + (process.execPath || 'node'),
-        ...(fs.existsSync(path.join(__dirname, 'cookies.txt')) ? ['--cookies', path.join(__dirname, 'cookies.txt')] : []),
-        '--force-ipv4',
-        '--no-warnings'
-      ])
-      let out = '', err = ''
-      proc.stdout.on('data', d => out += d)
-      proc.stderr.on('data', d => err += d)
-      proc.on('close', code => {
-        const u = out.trim()
-        if (code === 0 && u) resolve(u)
-        else reject(new Error(err.trim() || 'yt-dlp failed'))
-      })
-      proc.on('error', reject)
-      // Kill yt-dlp if it takes too long
-      setTimeout(() => { try { proc.kill() } catch {} }, 15000)
-    })
-    audioUrlCache.set(videoId, { url, exp: now + 50 * 60 * 1000 }) // 50 min TTL
-    return url
+    // 2. Fallback: search YouTube via yt-dlp for the same content
+    try {
+      console.log(`[audio] Trying yt-dlp search fallback for ${videoId}...`)
+      const url = await ytdlpGetUrl(`ytsearch1:${videoId}`)
+      audioUrlCache.set(videoId, { url, exp: now + 30 * 60 * 1000 })
+      return url
+    } catch (e2) {
+      console.log(`[audio] Search fallback also failed: ${e2.message?.substring(0, 100)}`)
+    }
+
+    throw new Error('Could not extract audio URL — video may be unavailable')
   })()
 
   inFlightResolvers.set(videoId, resolvePromise)

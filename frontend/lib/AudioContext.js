@@ -58,7 +58,14 @@ export function AudioProvider({ children }) {
     const onCanPlay = () => { setAudioLoading(false); setAudioError(null) }
     const onPlaying = () => { setAudioLoading(false); setIsPlaying(true) }
     const onPause = () => setIsPlaying(false)
-    const onError = () => { setAudioLoading(false); setAudioError('Failed to load audio') }
+    const onError = (e) => {
+      setAudioLoading(false)
+      // Only show error if we actually have a src set (not when clearing)
+      const src = audioRef.current?.src
+      if (src && src !== window.location.href) {
+        setAudioError('Failed to load — tap retry or try another song')
+      }
+    }
     const onEnded = () => {
       if (repeat) { audio.currentTime = 0; audio.play() }
       else playNext()
@@ -121,13 +128,37 @@ export function AudioProvider({ children }) {
       }
 
       const audioUrl = `${API}/api/listen/audio/${videoId}`
-      urlCacheRef.current.set(videoId, audioUrl)
-      const fullSong = { ...song, videoId, audioUrl }
+
+      // Pre-check: verify the audio endpoint responds OK before setting src
+      try {
+        const check = await fetch(audioUrl, { method: 'HEAD' })
+        if (!check.ok) {
+          // Server couldn't get the audio — try searching by song name instead
+          console.warn(`Audio HEAD check failed (${check.status}) for ${videoId}, trying search...`)
+          const searchQuery = song.query || `${song.title} ${song.artist || ''}`
+          const searchR = await fetch(`${API}/api/listen/search?q=${encodeURIComponent(searchQuery)}`)
+          const searchD = searchR.ok ? await searchR.json() : {}
+          const alt = searchD.items?.find(item => item.videoId && item.videoId !== videoId)
+          if (alt) {
+            videoId = alt.videoId
+            song = { ...song, videoId, thumbnail: alt.thumbnail || song.thumbnail }
+          } else {
+            throw new Error('No alternative found')
+          }
+        }
+      } catch (headErr) {
+        // HEAD might not be supported — proceed anyway with the original URL
+        console.warn('HEAD pre-check skipped:', headErr.message)
+      }
+
+      const finalAudioUrl = `${API}/api/listen/audio/${videoId}`
+      urlCacheRef.current.set(videoId, finalAudioUrl)
+      const fullSong = { ...song, videoId, audioUrl: finalAudioUrl }
       setCurrentSong(fullSong)
 
       if (audioRef.current) {
         audioRef.current.pause()
-        audioRef.current.src = audioUrl
+        audioRef.current.src = finalAudioUrl
         // Use load() to immediately start buffering, then play
         audioRef.current.load()
         audioRef.current.play()
@@ -144,8 +175,21 @@ export function AudioProvider({ children }) {
 
       // Prefetch next song in background after short delay
       setTimeout(() => prefetchNext(videoId, songQueue.length > 0 ? songQueue : queue), 2000)
-    } catch (e) { setAudioError('Failed to load audio'); setAudioLoading(false) }
+    } catch (e) {
+      console.error('playSong error:', e)
+      setAudioError('Failed to load — tap retry or try another song')
+      setAudioLoading(false)
+    }
   }, [queue, prefetchNext])
+
+  // Retry current song
+  const retrySong = useCallback(() => {
+    if (currentSong) {
+      // Clear the cache for this videoId so it re-fetches
+      if (currentSong.videoId) urlCacheRef.current.delete(currentSong.videoId)
+      playSong(currentSong, queue)
+    }
+  }, [currentSong, queue, playSong])
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current || !currentSong) return
@@ -207,7 +251,7 @@ export function AudioProvider({ children }) {
       playerExpanded, setPlayerExpanded,
       queue, setQueue, queueIndex, setQueueIndex,
       shuffle, setShuffle, repeat, setRepeat,
-      audioRef, playSong, togglePlay, playNext, playPrev, seekTo, fmt, closePlayer,
+      audioRef, playSong, togglePlay, playNext, playPrev, seekTo, fmt, closePlayer, retrySong,
     }}>
       {/* Single global audio element — preload auto for faster start */}
       <audio ref={audioRef} preload="auto" style={{ display: 'none' }} />

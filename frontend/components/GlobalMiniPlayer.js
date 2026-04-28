@@ -52,6 +52,7 @@ export default function GlobalMiniPlayer() {
     queue, queueIndex, setQueueIndex, playSong,
     shuffle, setShuffle, repeat, setRepeat,
     closePlayer,
+    retrySong,
   } = useAudio()
 
   const [showQueue, setShowQueue] = useState(false)
@@ -225,8 +226,12 @@ export default function GlobalMiniPlayer() {
 
                 {/* Error */}
                 {audioError && (
-                  <div style={{ textAlign: 'center', padding: '8px 16px', background: 'rgba(255,78,78,0.2)', borderRadius: 12, marginBottom: 12, border: '1px solid rgba(255,78,78,0.3)' }}>
+                  <div style={{ textAlign: 'center', padding: '8px 16px', background: 'rgba(255,78,78,0.2)', borderRadius: 12, marginBottom: 12, border: '1px solid rgba(255,78,78,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
                     <span style={{ fontSize: 12, color: '#FF8080', fontWeight: 700 }}>{audioError}</span>
+                    <button onClick={retrySong}
+                      style={{ padding: '5px 14px', borderRadius: 50, fontSize: 11, fontWeight: 800, background: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer' }}>
+                      🔄 Retry
+                    </button>
                   </div>
                 )}
               </>
